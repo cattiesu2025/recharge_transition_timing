@@ -1,8 +1,8 @@
 # Battery-aware task-to-recharge transition
 
-版本沿革与验证证据记录在 [ResearchPilot 开发日志](docs/dev_log.md)；当前文件哈希清单在 [v0.2.3 manifest](docs/versions/v0.2.3.json)。后续每次修改按 [AGENTS.md](AGENTS.md) 追加版本记录。
+当前公开版本的文件哈希清单在 [v0.2.4 manifest](docs/versions/v0.2.4.json)。本地研究日志、计划与用户约束文件保留在 `docs/`，不纳入仓库。
 
-This project implements the experiment sketched in [recharge_return_plan.md](docs/recharge_return_plan.md), using the training and audit conventions of the adjacent Highway and LunarLander projects. It currently provides a **pilot implementation**, not trained formal evidence. The task extends MiniGrid 2.5.0 with custom battery, work, charge, reward, and event rules; see [the protocol](experiments/recharge_return/protocol.md) for precise endpoints.
+This project implements a battery-aware return-to-charge ONSET experiment using the training and audit conventions of the adjacent Highway and LunarLander projects. It currently provides a **pilot implementation**, not trained formal evidence. The task extends MiniGrid 2.5.0 with custom battery, work, charge, reward, and event rules; see [the protocol](experiments/recharge_return/protocol.md) for precise endpoints.
 
 ## Run locally
 
