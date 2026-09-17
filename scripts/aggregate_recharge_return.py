@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from experiments.recharge_return.config import load_config, load_manifest  # noqa: E402
+from experiments.recharge_return.config import canonical_hash, load_config, load_manifest  # noqa: E402
 
 
 KEYS = ("condition", "seed", "scenario_id", "intervention")
@@ -36,7 +36,8 @@ def read_rows(root: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def validate_completeness(rows: list[dict[str, Any]], seeds: list[int], ids: list[str]) -> dict[str, Any]:
+def validate_completeness(rows: list[dict[str, Any]], seeds: list[int], ids: list[str],
+                          expected_config_hash: str | None = None) -> dict[str, Any]:
     expected = {(c, s, i, v) for c in CONDITIONS for s in seeds for i in ids for v in INTERVENTIONS}
     keys = [tuple(row.get(k) for k in KEYS) for row in rows]
     counts = Counter(keys)
@@ -45,12 +46,15 @@ def validate_completeness(rows: list[dict[str, Any]], seeds: list[int], ids: lis
     unexpected = sorted(actual - expected)
     duplicates = sorted(k for k, count in counts.items() if count > 1)
     errors = sum(row.get("outcome") == "technical_error" for row in rows)
-    return {"complete": not (missing or unexpected or duplicates or errors),
+    schema_errors = sum(row.get("schema_version") != 2 for row in rows)
+    config_mismatches = sum(row.get("config_hash") != expected_config_hash for row in rows) if expected_config_hash else 0
+    return {"complete": not (missing or unexpected or duplicates or errors or schema_errors or config_mismatches),
             "expected_rows": len(expected), "actual_rows": len(rows),
             "missing": [dict(zip(KEYS, k)) for k in missing],
             "unexpected": [dict(zip(KEYS, k)) for k in unexpected],
             "duplicates": [dict(zip(KEYS, k)) for k in duplicates],
-            "technical_errors": errors}
+            "technical_errors": errors, "schema_errors": schema_errors,
+            "config_mismatches": config_mismatches}
 
 
 def seed_contrasts(rows: list[dict[str, Any]], seeds: list[int], minimum: int) -> list[dict[str, Any]]:
@@ -93,7 +97,8 @@ def exact_sign_test(values: list[float]) -> dict[str, Any]:
 
 def aggregate(config: dict[str, Any], manifest: list[Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
     seeds = [int(s) for s in config["experiment"]["seeds"]]
-    integrity = validate_completeness(rows, seeds, [s.scenario_id for s in manifest])
+    integrity = validate_completeness(rows, seeds, [s.scenario_id for s in manifest],
+                                      canonical_hash(config))
     contrasts = seed_contrasts(rows, seeds, int(config["evaluation"]["minimum_joint_events"]))
     event_groups = defaultdict(list)
     outcomes = Counter()
@@ -110,8 +115,15 @@ def aggregate(config: dict[str, Any], manifest: list[Any], rows: list[dict[str, 
                       "episodes": len(group),
                       "confirmed_returns": sum(bool(r["primary_observed"]) for r in group),
                       "task_successes": sum(bool(r.get("task_success")) for r in group),
+                      "dock_arrivals": sum(bool(r.get("docked")) for r in group),
+                      "empty_returns": sum(r.get("outcome") == "returned_without_work" for r in group),
+                      "quota_completions": sum(bool(r.get("quota_completed")) for r in group),
                       "exhaustions": sum(bool(r.get("exhausted")) for r in group),
-                      "completed_work_mean": sum(r.get("completed_work", 0) for r in group) / len(group)})
+                      "completed_work_mean": sum(r.get("completed_work", 0) for r in group) / len(group),
+                      "returned_work_mean": sum(r.get("returned_work", 0) for r in group) / len(group),
+                      "dock_battery_mean": (sum(r["dock_battery"] for r in group if r.get("dock_battery") is not None)
+                                             / sum(r.get("dock_battery") is not None for r in group))
+                                             if any(r.get("dock_battery") is not None for r in group) else None})
     detector_rates = [{"condition": c, "intervention": v, "detector": name,
                        "episodes": len(group), "events": sum(bool(d["observed"]) for d in group)}
                       for (c, v, name), group in sorted(detectors.items())]
@@ -125,7 +137,7 @@ def aggregate(config: dict[str, Any], manifest: list[Any], rows: list[dict[str, 
                                          int(config["evaluation"]["bootstrap_seed"]))
         estimate["supports_R1"] = estimate["ci_lower"] > 0
         sign = exact_sign_test(values)
-    return {"schema_version": 1, "phase": config["experiment"]["phase"],
+    return {"schema_version": 2, "phase": config["experiment"]["phase"],
             "integrity": integrity, "all_seeds_estimable": all_estimable,
             "seed_contrasts": contrasts, "confirmatory_prod_minus_res_steps": estimate,
             "exact_sign_test": sign, "event_and_task_counts": rates,

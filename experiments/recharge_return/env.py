@@ -1,7 +1,7 @@
-"""Fully observed MiniGrid task corridor with atomic battery actions.
+"""Fully observed single-sortie MiniGrid work-to-home corridor.
 
-The work tile is (1, 4); the charger is (distance + 1, 4).  Cells
-between them belong only to the charging branch.  Obstacles occupy every
+The work tile is (1, 4); home is (distance + 1, 4). Cells
+between them belong only to the return branch. Obstacles occupy every
 other cell of the 17 x 9 MiniGrid grid.
 """
 
@@ -25,7 +25,6 @@ class Action(IntEnum):
     FORWARD = 2
     WAIT = 3
     WORK = 4
-    CHARGE = 5
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,7 @@ class RechargeEnv(MiniGridEnv):
         if render_mode not in (None, "ansi", "rgb_array", "human"):
             raise ValueError(f"Unsupported render mode: {render_mode}")
         super().__init__(mission_space=MissionSpace(
-            mission_func=lambda: "Complete work and manage battery at the dock"
+            mission_func=lambda: "Work and return home safely"
         ), width=17, height=9, max_steps=int(config["environment"]["max_steps"]),
             see_through_walls=True, render_mode=render_mode if render_mode != "ansi" else None)
         self._requested_render_mode = render_mode
@@ -63,16 +62,14 @@ class RechargeEnv(MiniGridEnv):
             raise ValueError(f"Unknown condition: {condition}")
         self.condition = condition
         self.action_space = spaces.Discrete(len(Action))
-        self.observation_space = spaces.Box(0.0, 1.0, shape=(9,), dtype=np.float32)
+        self.observation_space = spaces.Box(0.0, 1.0, shape=(8,), dtype=np.float32)
         self.scenario: Scenario | None = None
         self.position = (1, 4)
         self.direction = 0
         self.battery = 0.0
         self.remaining = 0
         self.steps = 0
-        self.charge_streak = 0
         self.total_work = 0
-        self.charge_steps = 0
         self.done = False
 
     @property
@@ -97,14 +94,14 @@ class RechargeEnv(MiniGridEnv):
         for y in range(1, height - 1):
             for x in range(1, width - 1):
                 self.grid.set(x, y, Wall())
-        for x in range(1, self.charger[0] + 1):
-            color = "green" if x == 1 else "yellow" if x == self.charger[0] else "blue"
+        for x in range(1, self.dock[0] + 1):
+            color = "green" if x == 1 else "yellow" if x == self.dock[0] else "blue"
             self.grid.set(x, 4, Floor(color))
         self.position = (1, 4)
         self.direction = 0
 
     @property
-    def charger(self) -> tuple[int, int]:
+    def dock(self) -> tuple[int, int]:
         assert self.scenario is not None
         return (self.scenario.distance + 1, 4)
 
@@ -118,9 +115,9 @@ class RechargeEnv(MiniGridEnv):
         assert self.scenario is not None
         x, y = self.position if position is None else position
         heading = self.direction if direction is None else direction
-        if y != 4 or not 1 <= x <= self.charger[0]:
+        if y != 4 or not 1 <= x <= self.dock[0]:
             raise ValueError("Position is not on the task corridor")
-        moves = self.charger[0] - x
+        moves = self.dock[0] - x
         if moves == 0:
             return 0.0
         turns = min((0 - heading) % 4, (heading - 0) % 4)
@@ -139,7 +136,6 @@ class RechargeEnv(MiniGridEnv):
             self.direction / 3, self.battery / capacity,
             self.remaining / int(self.params["max_quota"]),
             (int(self.params["max_steps"]) - self.steps) / int(self.params["max_steps"]),
-            self.charge_streak / max(1, int(self.params["charge_progress_steps"])),
             self.scenario.distance / 15, self.margin / capacity if self.margin >= 0 else 0,
         ], dtype=np.float32)
 
@@ -158,7 +154,7 @@ class RechargeEnv(MiniGridEnv):
         self.direction = 0
         self.battery = scenario.battery
         self.remaining = scenario.quota
-        self.steps = self.charge_streak = self.total_work = self.charge_steps = 0
+        self.steps = self.total_work = 0
         self.done = False
         return self._observation(), self._info()
 
@@ -167,8 +163,6 @@ class RechargeEnv(MiniGridEnv):
                 "battery": self.battery, "remaining": self.remaining,
                 "margin": self.margin, "minimum_energy_to_dock": self.minimum_energy_to_dock(),
                 "steps": self.steps, "total_work": self.total_work,
-                "charge_steps": self.charge_steps,
-                "charge_streak": self.charge_streak,
                 "scenario": asdict(self.scenario) if self.scenario else None}
 
     def step(self, action: int):
@@ -180,7 +174,6 @@ class RechargeEnv(MiniGridEnv):
         affordable = battery_before >= self._cost(action)
         valid = affordable
         work_completed = 0
-        charged = False
         if not affordable:
             pass
         elif action == Action.LEFT:
@@ -190,7 +183,7 @@ class RechargeEnv(MiniGridEnv):
         elif action == Action.FORWARD:
             dx, dy = DIRS[self.direction]
             target = (before[0] + dx, before[1] + dy)
-            if target[1] == 4 and 1 <= target[0] <= self.charger[0]:
+            if target[1] == 4 and 1 <= target[0] <= self.dock[0]:
                 self.position = target
             else:
                 valid = False
@@ -201,32 +194,16 @@ class RechargeEnv(MiniGridEnv):
                 work_completed = 1
             else:
                 valid = False
-        elif action == Action.CHARGE:
-            if self.position == self.charger:
-                charged = True
-                self.charge_steps += 1
-                self.charge_streak = min(self.charge_streak + 1,
-                                         int(self.params["charge_progress_steps"]))
-            else:
-                valid = False
-        if action != Action.CHARGE or not charged:
-            self.charge_streak = 0
-
-        # All actions first pay their cost. Arriving at the dock on the final
-        # energy unit is legal; charging only becomes available next step.
+        # Arrival with zero battery is exhaustion, including on the dock.
         self.battery = max(0.0, self.battery - self._cost(action))
-        if charged:
-            self.battery = min(float(self.params["capacity"]),
-                               self.battery + float(self.params["charge_gain"]))
         self.steps += 1
         self.step_count = self.steps
-        exhausted = self.battery <= 0 and self.position != self.charger
-        # Zero on the dock can be rescued only if the next CHARGE action has
-        # zero cost. With positive charge cost it is terminal exhaustion.
-        exhausted = exhausted or (self.battery <= 0 and self._cost(Action.CHARGE) > 0)
-        completed = self.remaining == 0 and not exhausted
+        exhausted = self.battery <= 0
+        docked = self.position == self.dock and not exhausted
+        completed = docked and self.total_work > 0
+        empty_return = docked and self.total_work == 0
         timed_out = self.steps >= int(self.params["max_steps"])
-        terminated = completed or exhausted
+        terminated = docked or exhausted
         truncated = timed_out and not terminated
         self.done = terminated or truncated
         deficit = np.clip((float(self.reward_params["safe_margin"]) - self.margin)
@@ -236,14 +213,16 @@ class RechargeEnv(MiniGridEnv):
                   - float(weights["reserve"]) * float(deficit)
                   - float(self.reward_params["time_cost"]))
         if completed:
-            reward += float(self.reward_params["completion_bonus"])
+            reward += float(self.reward_params["return_bonus"])
+        if empty_return:
+            reward -= float(self.reward_params["empty_return_penalty"])
         if exhausted:
             reward -= float(self.reward_params["exhaustion_penalty"])
         info = self._info()
         info.update({"action": action.name, "valid": valid, "moved": self.position != before,
-                     "work_completed": work_completed, "charged": charged,
-                     "completed": completed, "exhausted": exhausted,
-                     "outcome": "completed" if completed else "exhausted" if exhausted
+                     "work_completed": work_completed,
+                     "completed": completed, "docked": docked, "exhausted": exhausted,
+                     "outcome": "returned" if completed else "returned_without_work" if empty_return else "exhausted" if exhausted
                      else "time_limit" if truncated else None})
         return self._observation(), float(reward), terminated, truncated, info
 
@@ -252,10 +231,10 @@ class RechargeEnv(MiniGridEnv):
             return super().render()
         cells = ["#" * 17 for _ in range(9)]
         row = list(cells[4])
-        for x in range(1, self.charger[0] + 1):
+        for x in range(1, self.dock[0] + 1):
             row[x] = "."
         row[1] = "W"
-        row[self.charger[0]] = "C"
+        row[self.dock[0]] = "H"
         row[self.position[0]] = "A"
         cells[4] = "".join(row)
         return "\n".join(cells)
@@ -280,7 +259,7 @@ def rollout(env: RechargeEnv, scenario: Scenario,
                         "margin": after["margin"],
                         "minimum_energy_to_dock": after["minimum_energy_to_dock"],
                         "minimum_energy_to_dock_before": before["minimum_energy_to_dock"],
-                        "work_completed": after["work_completed"], "charged": after["charged"],
+                        "work_completed": after["work_completed"], "docked": after["docked"],
                         "moved": after["moved"], "valid": after["valid"],
                         "terminated": terminated, "truncated": truncated,
                         "outcome": after["outcome"], "reward": reward})

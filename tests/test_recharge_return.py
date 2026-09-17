@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from experiments.recharge_return.config import load_config, load_manifest
+from experiments.recharge_return.config import canonical_hash, load_config, load_manifest
 from experiments.recharge_return.env import Action, RechargeEnv, Scenario, rollout
 from experiments.recharge_return.events import DetectorConfig, detect_onset
 from experiments.recharge_return.agent import sample_training_scenario
@@ -25,7 +25,7 @@ def test_minigrid_backend_layout_and_render():
     env = RechargeEnv(CONFIG, render_mode="rgb_array")
     assert isinstance(env, MiniGridEnv)
     observation, _ = env.reset(options={"scenario": Scenario("test", 4, 16, 6)})
-    assert observation.shape == (9,)
+    assert observation.shape == (8,)
     assert env.grid.get(1, 4).type == "floor"
     assert env.grid.get(5, 4).type == "floor"
     assert env.grid.get(1, 3).type == "wall"
@@ -57,32 +57,27 @@ def test_invalid_action_costs_energy_and_no_work_reward():
     assert env.remaining == 6 and env.battery == battery - 3.5
 
 
-def test_last_step_to_dock_then_charge_and_continue():
-    env = make_env(battery=4.25)
+def test_work_cap_requires_final_return():
+    env = make_env(battery=16, quota=1)
+    _, _, terminated, _, info = env.step(Action.WORK)
+    assert not terminated and info["remaining"] == 0
     for _ in range(4):
         _, _, terminated, _, info = env.step(Action.FORWARD)
-    assert not terminated and info["position"] == [5, 4] and env.battery == .25
-    _, _, terminated, _, info = env.step(Action.CHARGE)
-    assert not terminated and info["charged"] and env.battery == 6
-    assert env.remaining == 6
-    env.step(Action.CHARGE)
-    # Return to work and do actual work after first charge.
-    env.step(Action.LEFT); env.step(Action.LEFT)
-    for _ in range(4):
-        env.step(Action.FORWARD)
-    _, _, _, _, info = env.step(Action.WORK)
-    assert info["work_completed"] == 1
+    assert terminated and info["outcome"] == "returned" and info["docked"]
+    with pytest.raises(RuntimeError):
+        env.step(Action.LEFT)
 
 
-def test_charging_cannot_earn_positive_reward():
+def test_zero_work_return_is_separate_outcome():
     env = make_env(battery=10)
+    assert "CHARGE" not in Action.__members__
     for _ in range(4):
-        env.step(Action.FORWARD)
-    rewards = [env.step(Action.CHARGE)[1] for _ in range(4)]
-    assert all(reward < 0 for reward in rewards)
+        _, reward, terminated, _, info = env.step(Action.FORWARD)
+    assert terminated and info["outcome"] == "returned_without_work"
+    assert not info["completed"] and info["docked"] and reward < 0
 
 
-def test_both_grids_require_energy_to_finish_without_charge_and_high_battery_is_sufficient():
+def test_both_grids_allow_one_safe_work_but_not_full_cap_with_safe_margin():
     for name in ("development", "held_out"):
         rows = load_manifest(f"experiments/recharge_return/grids/{name}.json")
         assert len(rows) == 27
@@ -90,8 +85,10 @@ def test_both_grids_require_energy_to_finish_without_charge_and_high_battery_is_
             env = RechargeEnv(CONFIG)
             env.reset(options={"scenario": row})
             work_energy = row.quota * env._cost(Action.WORK)
-            assert work_energy > row.battery
-            assert CONFIG["environment"]["capacity"] - work_energy >= row.distance + CONFIG["reward"]["safe_margin"]
+            safe = CONFIG["reward"]["safe_margin"]
+            assert row.battery - env._cost(Action.WORK) - row.distance >= safe
+            assert row.battery - work_energy - row.distance < safe
+            assert CONFIG["environment"]["capacity"] - work_energy - row.distance >= safe
 
 
 def test_exhaustion_is_terminal_not_time_censoring():
@@ -105,6 +102,15 @@ def test_final_work_at_zero_energy_is_exhaustion():
     _, _, terminated, truncated, info = env.step(Action.WORK)
     assert terminated and not truncated and info["outcome"] == "exhausted"
     assert not info["completed"]
+
+
+def test_zero_battery_on_arrival_is_exhaustion():
+    env = make_env(battery=7.5)
+    env.step(Action.WORK)
+    for _ in range(4):
+        _, _, terminated, _, info = env.step(Action.FORWARD)
+    assert terminated and info["outcome"] == "exhausted"
+    assert not info["docked"]
 
 
 def test_confirmed_return_and_failed_candidates():
@@ -147,7 +153,7 @@ def test_training_scenarios_match_across_conditions():
 
 def test_completeness_retains_missing_and_technical_errors():
     rows = [{"condition": "RES", "seed": 1, "scenario_id": "a",
-             "intervention": "original", "outcome": "technical_error"}]
+             "intervention": "original", "outcome": "technical_error", "schema_version": 2}]
     integrity = validate_completeness(rows, [1], ["a"])
     assert not integrity["complete"] and integrity["technical_errors"] == 1
     assert len(integrity["missing"]) == 5
@@ -160,11 +166,26 @@ def test_pilot_never_produces_confirmatory_claim():
     rows = []
     for condition in ("RES", "BAL", "PROD"):
         for intervention in ("original", "sufficient_battery"):
-            rows.append({"condition": condition, "seed": 1, "scenario_id": "a",
-                         "intervention": intervention, "outcome": "completed",
-                         "terminal_category": "completed", "primary_observed": True,
+            rows.append({"schema_version": 2, "config_hash": canonical_hash(config),
+                         "condition": condition, "seed": 1, "scenario_id": "a",
+                         "intervention": intervention, "outcome": "returned",
+                         "terminal_category": "returned", "primary_observed": True,
                          "primary_onset_step": 2 if condition == "PROD" else 1,
-                         "task_success": True, "exhausted": False, "completed_work": 6})
+                         "task_success": True, "docked": True, "dock_battery": 4,
+                         "exhausted": False, "completed_work": 6})
     result = aggregate(config, [Scenario("a", 4, 16, 6)], rows)
     assert result["integrity"]["complete"]
     assert result["confirmatory_prod_minus_res_steps"] is None
+
+
+def test_old_schema_and_config_cannot_be_aggregated_as_new_evidence():
+    config = deepcopy(CONFIG)
+    config["experiment"]["seeds"] = [1]
+    rows = [{"schema_version": 1, "config_hash": "old", "condition": c, "seed": 1,
+             "scenario_id": "a", "intervention": i, "outcome": "returned",
+             "terminal_category": "returned", "primary_observed": True,
+             "primary_onset_step": 2} for c in ("RES", "BAL", "PROD")
+            for i in ("original", "sufficient_battery")]
+    integrity = aggregate(config, [Scenario("a", 4, 16, 6)], rows)["integrity"]
+    assert not integrity["complete"] and integrity["schema_errors"] == 6
+    assert integrity["config_mismatches"] == 6

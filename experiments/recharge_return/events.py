@@ -1,4 +1,4 @@
-"""Physical branch-entry onset and auxiliary event detectors."""
+"""Physical work-zone exit onset and auxiliary return event detectors."""
 
 from __future__ import annotations
 
@@ -84,11 +84,10 @@ def detect_onset(records: Iterable[dict[str, Any]], config: DetectorConfig) -> D
                            first.confirmation_step if first else None, candidates)
 
 
-def auxiliary_events(records: Iterable[dict[str, Any]], charger_x: int) -> dict[str, int | None]:
+def auxiliary_events(records: Iterable[dict[str, Any]], dock_x: int) -> dict[str, int | None]:
     rows = list(records)
     def first(predicate):
         return next((int(row["step"]) for row in rows if predicate(row)), None)
     return {"first_toward_dock_step": first(_toward_dock),
             "first_branch_exit_step": first(lambda r: r["position_before"] == [1, 4] and r["position"] == [2, 4]),
-            "first_dock_step": first(lambda r: r["position"] == [charger_x, 4]),
-            "first_charge_step": first(lambda r: bool(r.get("charged")))}
+            "first_dock_step": first(lambda r: r["position"] == [dock_x, 4])}

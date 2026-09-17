@@ -18,39 +18,39 @@
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d5_b19_q7",
+    "scenario_id": "held_out_d5_b20_q7",
     "distance": 5,
-    "battery": 19,
+    "battery": 20,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d5_b19_q9",
+    "scenario_id": "held_out_d5_b20_q9",
     "distance": 5,
-    "battery": 19,
+    "battery": 20,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d5_b19_q11",
+    "scenario_id": "held_out_d5_b20_q11",
     "distance": 5,
-    "battery": 19,
+    "battery": 20,
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d5_b21_q7",
+    "scenario_id": "held_out_d5_b23_q7",
     "distance": 5,
-    "battery": 21,
+    "battery": 23,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d5_b21_q9",
+    "scenario_id": "held_out_d5_b23_q9",
     "distance": 5,
-    "battery": 21,
+    "battery": 23,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d5_b21_q11",
+    "scenario_id": "held_out_d5_b23_q11",
     "distance": 5,
-    "battery": 21,
+    "battery": 23,
     "quota": 11
   },
   {
@@ -72,39 +72,39 @@
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d7_b19_q7",
+    "scenario_id": "held_out_d7_b20_q7",
     "distance": 7,
-    "battery": 19,
+    "battery": 20,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d7_b19_q9",
+    "scenario_id": "held_out_d7_b20_q9",
     "distance": 7,
-    "battery": 19,
+    "battery": 20,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d7_b19_q11",
+    "scenario_id": "held_out_d7_b20_q11",
     "distance": 7,
-    "battery": 19,
+    "battery": 20,
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d7_b21_q7",
+    "scenario_id": "held_out_d7_b23_q7",
     "distance": 7,
-    "battery": 21,
+    "battery": 23,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d7_b21_q9",
+    "scenario_id": "held_out_d7_b23_q9",
     "distance": 7,
-    "battery": 21,
+    "battery": 23,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d7_b21_q11",
+    "scenario_id": "held_out_d7_b23_q11",
     "distance": 7,
-    "battery": 21,
+    "battery": 23,
     "quota": 11
   },
   {
@@ -126,39 +126,39 @@
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d9_b19_q7",
+    "scenario_id": "held_out_d9_b20_q7",
     "distance": 9,
-    "battery": 19,
+    "battery": 20,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d9_b19_q9",
+    "scenario_id": "held_out_d9_b20_q9",
     "distance": 9,
-    "battery": 19,
+    "battery": 20,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d9_b19_q11",
+    "scenario_id": "held_out_d9_b20_q11",
     "distance": 9,
-    "battery": 19,
+    "battery": 20,
     "quota": 11
   },
   {
-    "scenario_id": "held_out_d9_b21_q7",
+    "scenario_id": "held_out_d9_b23_q7",
     "distance": 9,
-    "battery": 21,
+    "battery": 23,
     "quota": 7
   },
   {
-    "scenario_id": "held_out_d9_b21_q9",
+    "scenario_id": "held_out_d9_b23_q9",
     "distance": 9,
-    "battery": 21,
+    "battery": 23,
     "quota": 9
   },
   {
-    "scenario_id": "held_out_d9_b21_q11",
+    "scenario_id": "held_out_d9_b23_q11",
     "distance": 9,
-    "battery": 21,
+    "battery": 23,
     "quota": 11
   }
 ]

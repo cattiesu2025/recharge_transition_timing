@@ -30,18 +30,10 @@ def reference_policy(env: RechargeEnv) -> int:
     """A deterministic threshold controller for task feasibility only."""
     safe = float(env.config["reward"]["safe_margin"])
     if env.position == (1, 4):
-        if (env.remaining == 1 and env.battery >= env._cost(Action.WORK)) or (
-            env.battery - env._cost(Action.WORK) - env.minimum_energy_to_dock() >= safe
-        ):
+        if env.remaining > 0 and env.battery - env._cost(Action.WORK) - env.minimum_energy_to_dock() >= safe:
             return Action.WORK
         return Action.FORWARD if env.direction == 0 else Action.LEFT
-    if env.position == env.charger:
-        if env.battery < float(env.params["capacity"]):
-            return Action.CHARGE
-        return Action.LEFT if env.direction in (0, 3) else Action.RIGHT if env.direction == 1 else Action.FORWARD
     if env.direction == 0:
-        return Action.FORWARD
-    if env.direction == 2:
         return Action.FORWARD
     return Action.LEFT
 
@@ -49,8 +41,10 @@ def reference_policy(env: RechargeEnv) -> int:
 def classify(result: dict[str, Any], onset: dict[str, Any]) -> str:
     outcome = result["outcome"]
     observed = onset["observed"]
-    if outcome == "completed" and not observed:
-        return "completed_without_return"
+    if outcome == "returned" and not observed:
+        return "returned_without_confirmed_onset"
+    if outcome == "returned_without_work":
+        return outcome
     if outcome == "exhausted":
         return "exhausted_after_confirmed_return" if observed else "exhausted_before_confirmed_return"
     if outcome == "time_limit" and not observed:
@@ -78,7 +72,7 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
     with gzip.open(trajectory, "wt", encoding="utf-8") as handle:
         for row in records:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
-    row = {"schema_version": 1, "condition": condition, "seed": seed,
+    row = {"schema_version": 2, "condition": condition, "seed": seed,
            "scenario_id": scenario.scenario_id, "intervention": intervention,
            "outcome": result["outcome"], "terminal_category": classify(result, primary),
            "primary_observed": primary["observed"],
@@ -86,9 +80,12 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
            "primary_confirmation_step": primary["confirmation_step"],
            "candidate_count": len(primary["candidates"]),
            "detectors": detectors, **aux, "completed_work": result["final"]["total_work"],
-           "task_success": result["outcome"] == "completed",
+           "task_success": result["outcome"] == "returned",
+           "docked": result["final"]["docked"],
+           "quota_completed": result["final"]["remaining"] == 0,
+           "returned_work": result["final"]["total_work"] if result["outcome"] == "returned" else 0,
+           "dock_battery": result["final"]["battery"] if result["final"]["docked"] else None,
            "exhausted": result["outcome"] == "exhausted",
-           "charge_steps": result["final"]["charge_steps"],
            "walk_steps": sum(r["action"] == Action.FORWARD and r["moved"] for r in records),
            "wait_steps": sum(r["action"] == Action.WAIT for r in records),
            "work_steps": sum(r["work_completed"] for r in records),
@@ -114,7 +111,7 @@ def command_probe(args: argparse.Namespace) -> None:
             result = rollout(env, target, lambda _: reference_policy(env))
             rows.append({"scenario_id": scenario.scenario_id, "intervention": intervention,
                          "outcome": result["outcome"], "completed_work": result["final"]["total_work"],
-                         "charge_steps": result["final"]["charge_steps"],
+                         "dock_battery": result["final"]["battery"] if result["final"]["docked"] else None,
                          "onset": detect_onset(result["records"], DetectorConfig(**{
                              "window_steps": config["detector"]["window_steps"],
                              "progress_moves": config["detector"]["progress_moves"]})).to_dict()})
@@ -168,7 +165,7 @@ def command_evaluate(args: argparse.Namespace) -> None:
                                    intervention, model, checkpoint_hash, output)
             except Exception as error:
                 errors += 1
-                row = {"schema_version": 1, "condition": args.condition, "seed": args.seed,
+                row = {"schema_version": 2, "condition": args.condition, "seed": args.seed,
                        "scenario_id": scenario.scenario_id, "intervention": intervention,
                        "outcome": "technical_error", "terminal_category": "technical_error",
                        "primary_observed": False, "primary_onset_step": None,
