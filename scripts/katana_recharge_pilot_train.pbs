@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -N recharge_pilot
+#PBS -l select=1:ncpus=4:mem=8gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$PBS_O_WORKDIR"
+: "${CONDITION:?Set CONDITION to RES, BAL, or PROD}"
+: "${SEED:?Set SEED to 4100, 4101, or 4102}"
+python -m experiments.recharge_return.run train \
+  --condition "$CONDITION" --seed "$SEED" \
+  --output "outputs/recharge_return_pilot/${CONDITION}/${SEED}"

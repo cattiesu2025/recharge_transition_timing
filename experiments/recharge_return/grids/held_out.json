@@ -1,0 +1,164 @@
+[
+  {
+    "scenario_id": "held_out_d5_b17_q7",
+    "distance": 5,
+    "battery": 17,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d5_b17_q9",
+    "distance": 5,
+    "battery": 17,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d5_b17_q11",
+    "distance": 5,
+    "battery": 17,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d5_b19_q7",
+    "distance": 5,
+    "battery": 19,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d5_b19_q9",
+    "distance": 5,
+    "battery": 19,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d5_b19_q11",
+    "distance": 5,
+    "battery": 19,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d5_b21_q7",
+    "distance": 5,
+    "battery": 21,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d5_b21_q9",
+    "distance": 5,
+    "battery": 21,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d5_b21_q11",
+    "distance": 5,
+    "battery": 21,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d7_b17_q7",
+    "distance": 7,
+    "battery": 17,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d7_b17_q9",
+    "distance": 7,
+    "battery": 17,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d7_b17_q11",
+    "distance": 7,
+    "battery": 17,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d7_b19_q7",
+    "distance": 7,
+    "battery": 19,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d7_b19_q9",
+    "distance": 7,
+    "battery": 19,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d7_b19_q11",
+    "distance": 7,
+    "battery": 19,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d7_b21_q7",
+    "distance": 7,
+    "battery": 21,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d7_b21_q9",
+    "distance": 7,
+    "battery": 21,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d7_b21_q11",
+    "distance": 7,
+    "battery": 21,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d9_b17_q7",
+    "distance": 9,
+    "battery": 17,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d9_b17_q9",
+    "distance": 9,
+    "battery": 17,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d9_b17_q11",
+    "distance": 9,
+    "battery": 17,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d9_b19_q7",
+    "distance": 9,
+    "battery": 19,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d9_b19_q9",
+    "distance": 9,
+    "battery": 19,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d9_b19_q11",
+    "distance": 9,
+    "battery": 19,
+    "quota": 11
+  },
+  {
+    "scenario_id": "held_out_d9_b21_q7",
+    "distance": 9,
+    "battery": 21,
+    "quota": 7
+  },
+  {
+    "scenario_id": "held_out_d9_b21_q9",
+    "distance": 9,
+    "battery": 21,
+    "quota": 9
+  },
+  {
+    "scenario_id": "held_out_d9_b21_q11",
+    "distance": 9,
+    "battery": 21,
+    "quota": 11
+  }
+]

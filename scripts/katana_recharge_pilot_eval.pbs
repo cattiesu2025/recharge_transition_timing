@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N recharge_eval
+#PBS -l select=1:ncpus=2:mem=4gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+set -euo pipefail
+cd "$PBS_O_WORKDIR"
+: "${CONDITION:?Set CONDITION to RES, BAL, or PROD}"
+: "${SEED:?Set SEED to 4100, 4101, or 4102}"
+python -m experiments.recharge_return.run evaluate \
+  --condition "$CONDITION" --seed "$SEED" \
+  --manifest experiments/recharge_return/grids/development.json \
+  --checkpoint "outputs/recharge_return_pilot/${CONDITION}/${SEED}/final.zip" \
+  --output "outputs/recharge_return_pilot/dev_eval/${CONDITION}/${SEED}"

@@ -1,0 +1,164 @@
+[
+  {
+    "scenario_id": "development_d4_b16_q6",
+    "distance": 4,
+    "battery": 16,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d4_b16_q8",
+    "distance": 4,
+    "battery": 16,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d4_b16_q10",
+    "distance": 4,
+    "battery": 16,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d4_b18_q6",
+    "distance": 4,
+    "battery": 18,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d4_b18_q8",
+    "distance": 4,
+    "battery": 18,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d4_b18_q10",
+    "distance": 4,
+    "battery": 18,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d4_b20_q6",
+    "distance": 4,
+    "battery": 20,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d4_b20_q8",
+    "distance": 4,
+    "battery": 20,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d4_b20_q10",
+    "distance": 4,
+    "battery": 20,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d6_b16_q6",
+    "distance": 6,
+    "battery": 16,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d6_b16_q8",
+    "distance": 6,
+    "battery": 16,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d6_b16_q10",
+    "distance": 6,
+    "battery": 16,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d6_b18_q6",
+    "distance": 6,
+    "battery": 18,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d6_b18_q8",
+    "distance": 6,
+    "battery": 18,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d6_b18_q10",
+    "distance": 6,
+    "battery": 18,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d6_b20_q6",
+    "distance": 6,
+    "battery": 20,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d6_b20_q8",
+    "distance": 6,
+    "battery": 20,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d6_b20_q10",
+    "distance": 6,
+    "battery": 20,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d8_b16_q6",
+    "distance": 8,
+    "battery": 16,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d8_b16_q8",
+    "distance": 8,
+    "battery": 16,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d8_b16_q10",
+    "distance": 8,
+    "battery": 16,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d8_b18_q6",
+    "distance": 8,
+    "battery": 18,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d8_b18_q8",
+    "distance": 8,
+    "battery": 18,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d8_b18_q10",
+    "distance": 8,
+    "battery": 18,
+    "quota": 10
+  },
+  {
+    "scenario_id": "development_d8_b20_q6",
+    "distance": 8,
+    "battery": 20,
+    "quota": 6
+  },
+  {
+    "scenario_id": "development_d8_b20_q8",
+    "distance": 8,
+    "battery": 20,
+    "quota": 8
+  },
+  {
+    "scenario_id": "development_d8_b20_q10",
+    "distance": 8,
+    "battery": 20,
+    "quota": 10
+  }
+]
