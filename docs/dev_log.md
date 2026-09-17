@@ -109,3 +109,35 @@
 - `git diff --cached --check` 通过；初始提交为 `ad90e05`（`Initialize recharge return pilot v0.2.2`）。
 - 已将 `main` 推送到用户指定的 `https://github.com/cattiesu2025/recharge_transition_timing.git`，Git 回报 `main -> main` 并建立 `origin/main` 跟踪关系。
 - 本次发布只包含 pilot 代码和文档，不包含 `.venv`、生成输出或完整 pilot/formal 结果。
+
+### 2026-09-17 — v0.2.3：Katana 环境安装入口（进行中）
+
+**改动原因**：用户询问在 Katana 用哪个文件安装环境；现有仓库仅有 train/eval PBS，它们直接调用未激活的 `python`，没有可提交的 setup 作业。
+
+**设计文档先行**：`docs/recharge_return_plan.md` 的实现与验证部分已加入独立 setup 作业、共享 venv、训练/评估激活与版本核验规则；科学协议不变。
+
+**计划改动文件**：`scripts/katana_recharge_setup.pbs`、`scripts/katana_recharge_env.sh`、`scripts/katana_recharge_pilot_train.pbs`、`scripts/katana_recharge_pilot_eval.pbs`、`README.md`、`docs/versions/v0.2.3.json`，以及本追加日志。
+
+**验证与结果**：待 shell 语法、依赖检查和当前文件哈希完成后追加。Katana 计算节点安装尚未实际执行，不宣称环境已在集群建好。
+
+### 2026-09-17 — v0.2.3 文件改动记录（追加）
+
+- `scripts/katana_recharge_setup.pbs`：新增计算节点 setup 作业；加载可覆盖的 Python module，在共享 scratch 建 venv，安装 CPU PyTorch 与项目依赖，运行 `pip check`/pytest，并保存环境与依赖记录。
+- `scripts/katana_recharge_env.sh`：新增训练/评估共用激活与 Python/MiniGrid/venv 身份核验，设置项目路径和进程缓存目录。
+- `scripts/katana_recharge_pilot_train.pbs`、`scripts/katana_recharge_pilot_eval.pbs`：先激活并验证项目 venv，缺失时明确失败，不再使用未知的系统 Python。
+- `README.md`：加入 setup 作业文件名、`qsub` 命令、默认路径及覆盖变量。
+- `docs/dev_log.md`：追加本文件改动记录；科学协议、奖励与训练预算未变。
+
+**补充**：`scripts/katana_recharge_pilot_train.pbs` 支持可选 `RECHARGE_TRAIN_STEPS`。短程作业写入独立的 `outputs/recharge_return_smoke/`，避免覆盖正式 pilot seed 的固定预算 checkpoint；README 给出 10,000 步检查命令。
+
+### 2026-09-17 — v0.2.3 验证结果（追加）
+
+- `bash -n` 检查 setup、env、train、eval 四个 shell/PBS 文件：通过。
+- 用本地 `.venv` 和模拟的 `module` 命令 source `katana_recharge_env.sh`：正确激活项目 venv，确认 MiniGrid 2.5.0、SB3 2.9.0、PyTorch 2.10.0。
+- `.venv/bin/python -m pytest -q`：13 passed；两条既有的 `pkg_resources` 弃用警告。
+- `docs/versions/v0.2.3.json` 收录 23 个当前文件；逐文件 SHA-256 校验通过。
+- **尚未在 Katana 执行** `qsub scripts/katana_recharge_setup.pbs`；集群 module、网络、CPU PyTorch 安装和 PBS 资源请求仍需真实作业验证。科学协议和 pilot 训练预算未变。
+
+**入库修正**：提交前发现工作区 `.gitignore` 新增了 `docs/`，导致新的 `docs/versions/v0.2.3.json` 被忽略。该规则与用户要求的逐版留档冲突，已移除；`.venv` 与生成输出继续忽略。此改动纳入 v0.2.3 文件清单。
+
+**最终本地校验**：v0.2.3 清单扩展为 24 个文件（含 `.gitignore`），全部 SHA-256 匹配；四个 shell/PBS 文件 `bash -n` 通过，`git diff --check` 通过。上方的“23 个”保留为修正前的原始验证记录。

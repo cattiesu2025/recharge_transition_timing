@@ -1,0 +1,52 @@
+#!/bin/bash
+#PBS -N recharge_setup
+#PBS -l select=1:ncpus=2:mem=8gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:?Submit this job from the project root}"
+
+python_module="${RECHARGE_PYTHON_MODULE:-python/3.11.3}"
+required_python="${RECHARGE_PYTHON_VERSION:-3.11}"
+venv_dir="${RECHARGE_VENV_DIR:-/srv/scratch/$USER/environments/recharge-return-py311}"
+
+module load "$python_module"
+python - "$required_python" <<'PY'
+import sys
+expected = tuple(map(int, sys.argv[1].split(".")))
+if sys.version_info[:2] != expected:
+    raise SystemExit(f"Loaded Python {sys.version_info[:2]} does not match {expected}")
+PY
+
+mkdir -p "$(dirname "$venv_dir")"
+if [[ -x "$venv_dir/bin/python" ]]; then
+    "$venv_dir/bin/python" - "$required_python" <<'PY'
+import sys
+expected = tuple(map(int, sys.argv[1].split(".")))
+if sys.version_info[:2] != expected:
+    raise SystemExit("Existing recharge venv has a different Python version; choose a new RECHARGE_VENV_DIR")
+PY
+else
+    python -m venv "$venv_dir"
+fi
+
+source "$venv_dir/bin/activate"
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements.txt
+python -m pip check
+python -m pytest -q
+python - <<'PY'
+import gymnasium, minigrid, stable_baselines3, torch
+assert minigrid.__version__ == "2.5.0"
+print("Katana environment ready:", gymnasium.__version__, minigrid.__version__, stable_baselines3.__version__, torch.__version__)
+PY
+
+record_dir="outputs/recharge_return_pilot/environment"
+mkdir -p "$record_dir"
+python -m pip freeze > "$record_dir/pip-freeze.txt"
+python --version > "$record_dir/python-version.txt" 2>&1
+sha256sum requirements.txt > "$record_dir/requirements.sha256"
+printf '%s\n' "$venv_dir" > "$record_dir/venv-path.txt"
+echo "Environment installed and verified at $venv_dir"

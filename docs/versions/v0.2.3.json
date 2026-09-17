@@ -1,0 +1,52 @@
+{
+  "code_baseline": "v0.2.0 MiniGrid pilot",
+  "excluded_append_only": [
+    "docs/dev_log.md"
+  ],
+  "excluded_generated": [
+    ".venv/",
+    "outputs/",
+    ".pytest_cache/",
+    "**/__pycache__/"
+  ],
+  "files_sha256": {
+    ".gitignore": "f6df9f651fd781b55737ef596e410cd4bab483e9a2a3867654209fec9c9619ba",
+    "AGENTS.md": "607f3eb8a6b9574a4407be70984296fe980bae4462a37eabc1ffba8f8206295b",
+    "README.md": "98e4d7075df71e09c7ef31d5cc3970946809eea98277731a1f80bd950739a772",
+    "docs/recharge_return_plan.md": "afc2392f69e784dcc17edb820bd7cbb5c4460cc3de33cd127a14d3ade91316f9",
+    "docs/user_requirements.md": "17620c96e07d5721b165397459cb80eb2d2cd00f0ff726419fa75a5ec64b0935",
+    "experiments/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "experiments/recharge_return/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "experiments/recharge_return/agent.py": "402addb59273c58ccd256b1ec04c9b7ddde09019f79050d7a2c26f7dbbcff47e",
+    "experiments/recharge_return/config.py": "f0105cf3f2d4f5aac0f516cba3b8291c31fa8cfa7a38d80c50b2636d43a15f18",
+    "experiments/recharge_return/configs/pilot.yaml": "5e46ca3f1c246534d3a1da8d72ea409d3866b43167053cbd5532a78cf2c88555",
+    "experiments/recharge_return/env.py": "717bb1ad95331dd4f24e643a2b7214970d8e93812a6f462b4301f1cafbbca9d8",
+    "experiments/recharge_return/events.py": "4400ffc127b14152025aeac50666ff7b4e11343f21492879e90c650d6711c398",
+    "experiments/recharge_return/grids/development.json": "a7e3b6a024c58f9cb6663fee3cbadc8fecdd40e6c18997f2a615cca601b56873",
+    "experiments/recharge_return/grids/held_out.json": "0f782e3a3201df80b754f5b9b5538b6344c24cc68d8255e7b5c214d7acbb5e46",
+    "experiments/recharge_return/protocol.md": "999ec6fd50071b7ec2545a230c7171cf26edba6689822101c896d3f920c4f5c0",
+    "experiments/recharge_return/run.py": "859f69b89e713858ffc941e43fa4925d8136d5c4a622c537da6d6ad5cdea5a7e",
+    "requirements.txt": "b927f996a45e41598087f7a40e87068ec4006c920b722940a7fefb817f421a5f",
+    "scripts/aggregate_recharge_return.py": "3004601c66569918e57312b27405a08ca4a745f9abb586df4f1208f6a1a260c7",
+    "scripts/katana_recharge_env.sh": "bf21ac7c1865aa68a7e4bd3c990f75c7cd2ab2bd81fe2f3b845066b1118596b2",
+    "scripts/katana_recharge_pilot_eval.pbs": "4130c7e69d62c3c107a5a31e55fd42175e9fc56cb470912de8407d1a15fc3eaa",
+    "scripts/katana_recharge_pilot_train.pbs": "57bd898ed14befba24cdfb4a533bf637bda9f9f8efa1ef0e01d6f1b24b2c94a9",
+    "scripts/katana_recharge_setup.pbs": "76dc72054bd1fcd23011109829b7046080f2cf00a22f790cf414b343e4786b5d",
+    "tests/conftest.py": "8659c4f6af34a32f61ecc29774fd873cf628e7e0828ce9ff04773418357a6cc6",
+    "tests/test_recharge_return.py": "009aa65057710432f60f7cafc9fc69fefc8cbde0837d25b6c54083fb627e0f40"
+  },
+  "git_commit": null,
+  "historical_note": "v0.2.3 adds cluster setup and activation scripts; pilot and formal results remain unrun.",
+  "kind": "katana_environment_setup_workflow",
+  "packages": {
+    "gymnasium": "1.3.0",
+    "minigrid": "2.5.0",
+    "numpy": "2.5.3",
+    "stable-baselines3": "2.9.0",
+    "torch": "2.10.0"
+  },
+  "python": "3.13.9",
+  "recorded_on": "2026-09-17",
+  "schema_version": 1,
+  "version": "v0.2.3"
+}

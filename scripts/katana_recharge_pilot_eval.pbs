@@ -4,7 +4,8 @@
 #PBS -l walltime=04:00:00
 #PBS -j oe
 set -euo pipefail
-cd "$PBS_O_WORKDIR"
+cd "${PBS_O_WORKDIR:?Submit this job from the project root}"
+source scripts/katana_recharge_env.sh
 : "${CONDITION:?Set CONDITION to RES, BAL, or PROD}"
 : "${SEED:?Set SEED to 4100, 4101, or 4102}"
 python -m experiments.recharge_return.run evaluate \
