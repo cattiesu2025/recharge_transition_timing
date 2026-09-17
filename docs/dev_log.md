@@ -102,3 +102,10 @@
 **协议影响**：无。任务、奖励、模型和评估规则未变。
 
 **验证与发布结果**：待清单校验、提交和远端推送后追加；若认证失败，将记录实际状态，不称已发布。
+
+### 2026-09-17 — v0.2.2 发布验证（追加）
+
+- `docs/versions/v0.2.2.json` 的 21 个文件路径均存在且 SHA-256 全部匹配；`v0.2.1.json` 保持不变，仍记录移动前的历史路径。
+- `git diff --cached --check` 通过；初始提交为 `ad90e05`（`Initialize recharge return pilot v0.2.2`）。
+- 已将 `main` 推送到用户指定的 `https://github.com/cattiesu2025/recharge_transition_timing.git`，Git 回报 `main -> main` 并建立 `origin/main` 跟踪关系。
+- 本次发布只包含 pilot 代码和文档，不包含 `.venv`、生成输出或完整 pilot/formal 结果。
