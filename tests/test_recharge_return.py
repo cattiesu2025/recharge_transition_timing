@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import os
+import subprocess
 
 import pytest
 
@@ -21,6 +23,26 @@ def test_600k_pilot_changes_only_training_budget():
     assert extended["experiment"]["train_steps"] == 600000
     extended["experiment"]["train_steps"] = 300000
     assert extended == CONFIG
+
+
+def test_v040_pbs_array_assigns_each_condition_and_seed_once():
+    script = "scripts/katana_recharge_pilot_600k_v0.4.pbs"
+    observed = set()
+    for index in range(1, 10):
+        env = dict(os.environ, PBS_O_WORKDIR=os.getcwd(),
+                   PBS_ARRAY_INDEX=str(index), RECHARGE_VALIDATE_MAPPING_ONLY="1")
+        result = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert "configs/pilot_600k.yaml" in result.stdout
+        condition = ("RES", "BAL", "PROD")[(index - 1) // 3]
+        seed = (4100, 4101, 4102)[(index - 1) % 3]
+        assert f"condition={condition} seed={seed}" in result.stdout
+        observed.add((condition, seed))
+    assert len(observed) == 9
+
+    env["PBS_ARRAY_INDEX"] = "10"
+    result = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
+    assert result.returncode != 0
 
 
 def test_direct_safe_baseline_excludes_zero_battery_arrival():
