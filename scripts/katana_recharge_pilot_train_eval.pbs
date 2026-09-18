@@ -1,29 +1,42 @@
 #!/bin/bash
 #PBS -N recharge_pilot_train_eval
 #PBS -l select=1:ncpus=4:mem=8gb
-#PBS -l walltime=04:00:00
+#PBS -l walltime=08:00:00
 #PBS -j oe
 set -euo pipefail
 cd "${PBS_O_WORKDIR:?Submit this job from the project root}"
 source scripts/katana_recharge_env.sh
 : "${CONDITION:?Set CONDITION to RES, BAL, or PROD}"
 : "${SEED:?Set SEED to 4100, 4101, or 4102}"
+case "${RECHARGE_PILOT_BUDGET:-300k}" in
+  300k)
+    config="experiments/recharge_return/configs/pilot.yaml"
+    output_root="outputs/recharge_return_v0.3.0_pilot"
+    smoke_root="outputs/recharge_return_v0.3.0_smoke"
+    ;;
+  600k)
+    config="experiments/recharge_return/configs/pilot_600k.yaml"
+    output_root="outputs/recharge_return_v0.3.2_pilot_600k"
+    smoke_root="outputs/recharge_return_v0.3.2_smoke_600k"
+    ;;
+  *) echo "RECHARGE_PILOT_BUDGET must be 300k or 600k" >&2; exit 1 ;;
+esac
 if [[ -n "${RECHARGE_TRAIN_STEPS:-}" ]]; then
   [[ "$RECHARGE_TRAIN_STEPS" =~ ^[1-9][0-9]*$ ]] || { echo "RECHARGE_TRAIN_STEPS must be positive" >&2; exit 1; }
-  train_output="outputs/recharge_return_v0.3.0_smoke/${CONDITION}/${SEED}/${RECHARGE_TRAIN_STEPS}"
-  eval_output="outputs/recharge_return_v0.3.0_smoke/dev_eval/${CONDITION}/${SEED}/${RECHARGE_TRAIN_STEPS}"
+  train_output="${smoke_root}/${CONDITION}/${SEED}/${RECHARGE_TRAIN_STEPS}"
+  eval_output="${smoke_root}/dev_eval/${CONDITION}/${SEED}/${RECHARGE_TRAIN_STEPS}"
   steps_arg=(--steps "$RECHARGE_TRAIN_STEPS")
 else
-  train_output="outputs/recharge_return_v0.3.0_pilot/${CONDITION}/${SEED}"
-  eval_output="outputs/recharge_return_v0.3.0_pilot/dev_eval/${CONDITION}/${SEED}"
+  train_output="${output_root}/${CONDITION}/${SEED}"
+  eval_output="${output_root}/dev_eval/${CONDITION}/${SEED}"
   steps_arg=()
 fi
 python -m experiments.recharge_return.run train \
-  --condition "$CONDITION" --seed "$SEED" \
+  --config "$config" --condition "$CONDITION" --seed "$SEED" \
   --output "$train_output" "${steps_arg[@]}"
 checkpoint="$train_output/final.zip"
 [[ -s "$checkpoint" ]] || { echo "Training did not produce $checkpoint" >&2; exit 1; }
 python -m experiments.recharge_return.run evaluate \
-  --condition "$CONDITION" --seed "$SEED" \
+  --config "$config" --condition "$CONDITION" --seed "$SEED" \
   --manifest experiments/recharge_return/grids/development.json \
   --checkpoint "$checkpoint" --output "$eval_output"

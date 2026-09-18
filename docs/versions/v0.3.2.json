@@ -1,0 +1,51 @@
+{
+  "code_baseline": "v0.3.1 single-sortie pilot",
+  "excluded_generated": [
+    ".venv/",
+    "outputs/",
+    ".pytest_cache/",
+    "**/__pycache__/"
+  ],
+  "excluded_local_notes": [
+    "docs/dev_log.md",
+    "docs/recharge_return_plan.md",
+    "docs/user_requirements.md"
+  ],
+  "files_sha256": {
+    ".gitignore": "edfb74a047aa2bfcc0bc95d38f0bb90b64e01e8ef6811040396b3c9aa7b99d82",
+    "AGENTS.md": "a5fb63fcc06e67ab60136270c6fcbcce88b2341433218da3271b5691aaf98a93",
+    "README.md": "90813143dec61ba93d80cbadfa87501a40a6742e495c7300064b9f00e2cf123e",
+    "docs/versions/v0.2.1.json": "8878c53455db7189404660a84d4e3955d8cb74db2121714af661c5cbcfd6c8ac",
+    "docs/versions/v0.2.2.json": "dd478d4c5c9f8596e8b7e2b1f6373030c6b0496323db96c72414d20063e97f61",
+    "docs/versions/v0.2.3.json": "a31bb97ef187464150be63a6d3a96470b456f807521859f94dfe206e140c80ef",
+    "docs/versions/v0.2.4.json": "d84c152d09fd0be2791dae4400fe041b6e5b93ca2398e82f75ffcf8477473c52",
+    "docs/versions/v0.3.0.json": "344c6ac5adec98a9d6ccf2e50e09879cd080f2a5cca062f210a7a278b63dc9f9",
+    "docs/versions/v0.3.1.json": "bd65b4780eec6a63d28d06102c5bfc4c7b5bc958e0a71a8047e70fe77e5b3571",
+    "experiments/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "experiments/recharge_return/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "experiments/recharge_return/agent.py": "402addb59273c58ccd256b1ec04c9b7ddde09019f79050d7a2c26f7dbbcff47e",
+    "experiments/recharge_return/config.py": "f0105cf3f2d4f5aac0f516cba3b8291c31fa8cfa7a38d80c50b2636d43a15f18",
+    "experiments/recharge_return/configs/pilot.yaml": "637639b039637bdefe2fba032faac8d9fae8bbbccc3f57ecc0d820aebc888803",
+    "experiments/recharge_return/configs/pilot_600k.yaml": "2bd67458ed30b2020f25f174826749dc26dde69e9df592e41a6be9ab88f90cbf",
+    "experiments/recharge_return/env.py": "ab2eee09b4ff7e3dec806f5fdfd204b970b23d9b1b69afee43056b76d1ad98b4",
+    "experiments/recharge_return/events.py": "b965570798fdaa4099da51a1294b717f8fc5ec70846812d86b3999f189dc6014",
+    "experiments/recharge_return/grids/development.json": "18321e5116b2886a8a9d72ddd4130d3161d4189a1c7d5186a2ea2af76dba355e",
+    "experiments/recharge_return/grids/held_out.json": "a6473968e2cffcf041fecf8490a5443d88fe1511ae31d3fa112273d26d92ffb0",
+    "experiments/recharge_return/protocol.md": "60aab5d8b4482ef1ba024d39ef6381e5f9f0de73dc6a5e5df3b5da44d3902ff5",
+    "experiments/recharge_return/run.py": "44719ae1b4a9066e11d4aa0a14190d0994ed4b0fb605a06a6b01c6262a257b16",
+    "requirements.txt": "b927f996a45e41598087f7a40e87068ec4006c920b722940a7fefb817f421a5f",
+    "scripts/aggregate_recharge_return.py": "014a32eb10e8f7326a470116a70124a8c217367e996ba43d467fdb52f33b7746",
+    "scripts/diagnose_recharge_pilot.py": "efd7327eb40d0f4a97981bd84cb8d2fbfa482570c9d35496667c1f89f3f6ff6d",
+    "scripts/katana_recharge_env.sh": "bf21ac7c1865aa68a7e4bd3c990f75c7cd2ab2bd81fe2f3b845066b1118596b2",
+    "scripts/katana_recharge_pilot_train_eval.pbs": "e45c2a0bcc7b781887fab17f4bcb30eefaef8f8380baf41a817f65ccf9588ad4",
+    "scripts/katana_recharge_setup.pbs": "4d749110e9b8da992459f95d9426eb3c0005d22365fd5b5c8ae17d570fd3fc54",
+    "tests/conftest.py": "8659c4f6af34a32f61ecc29774fd873cf628e7e0828ce9ff04773418357a6cc6",
+    "tests/test_recharge_return.py": "7cbbe825489b30a098b6691c9c030a3ee369f23739221133af46a9890031efab"
+  },
+  "git_commit": null,
+  "historical_note": "v0.1.0 and v0.2.0 lack standalone source snapshots and remain unrecoverable as standalone versions. v0.3.0 has no independent committed source snapshot; v0.3.1 is available at commit 2e8e8db. This manifest records the v0.3.2 workspace and excludes itself from its file hashes.",
+  "kind": "pilot_training_budget_and_trajectory_diagnostic",
+  "recorded_on": "2026-09-18",
+  "schema_version": 1,
+  "version": "v0.3.2"
+}

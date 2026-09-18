@@ -9,10 +9,42 @@ from experiments.recharge_return.env import Action, RechargeEnv, Scenario, rollo
 from experiments.recharge_return.events import DetectorConfig, detect_onset
 from experiments.recharge_return.agent import sample_training_scenario
 from scripts.aggregate_recharge_return import aggregate, validate_completeness
+from scripts.diagnose_recharge_pilot import direct_safe_baseline, trajectory_metrics
 from minigrid.minigrid_env import MiniGridEnv
 
 
 CONFIG = load_config("experiments/recharge_return/configs/pilot.yaml")
+
+
+def test_600k_pilot_changes_only_training_budget():
+    extended = load_config("experiments/recharge_return/configs/pilot_600k.yaml")
+    assert extended["experiment"]["train_steps"] == 600000
+    extended["experiment"]["train_steps"] = 300000
+    assert extended == CONFIG
+
+
+def test_direct_safe_baseline_excludes_zero_battery_arrival():
+    scenario = Scenario("one_safe_work", 4, 8, 3)
+    baseline = direct_safe_baseline(CONFIG, "PROD", scenario)
+    assert baseline["work"] == 1
+    assert baseline["steps"] == 5
+    assert baseline["dock_battery"] == 0.5
+
+
+def test_trajectory_diagnostic_discount_and_idle_after_work():
+    scenario = Scenario("diagnostic", 4, 60, 2)
+    actions = iter([Action.WORK, Action.WORK, Action.WORK,
+                    Action.LEFT, Action.RIGHT, Action.WAIT,
+                    Action.FORWARD, Action.FORWARD, Action.FORWARD, Action.FORWARD])
+    result = rollout(RechargeEnv(CONFIG, "PROD"), scenario, lambda _: next(actions))
+    row = {"outcome": "returned", "completed_work": 2,
+           "return": result["return"], "primary_onset_step": 7}
+    metrics = trajectory_metrics(result["records"], row, 0.99)
+    assert metrics["invalid_actions"] == 1
+    assert metrics["turn_actions"] == 2
+    assert metrics["wait_actions"] == 1
+    assert metrics["post_work_onset_gap"] == 5
+    assert metrics["discounted_return"] != pytest.approx(result["return"])
 
 
 def make_env(battery=16, distance=4, quota=6):
