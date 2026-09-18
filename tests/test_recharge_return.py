@@ -5,6 +5,7 @@ import os
 import subprocess
 
 import pytest
+import yaml
 
 from experiments.recharge_return.config import canonical_hash, load_config, load_manifest
 from experiments.recharge_return.env import Action, RechargeEnv, Scenario, rollout
@@ -15,25 +16,33 @@ from scripts.diagnose_recharge_pilot import direct_safe_baseline, trajectory_met
 from minigrid.minigrid_env import MiniGridEnv
 
 
-CONFIG = load_config("experiments/recharge_return/configs/pilot.yaml")
+CONFIG = load_config("experiments/recharge_return/configs/pilot_no_wait_600k.yaml")
 
 
-def test_600k_pilot_changes_only_training_budget():
-    extended = load_config("experiments/recharge_return/configs/pilot_600k.yaml")
-    assert extended["experiment"]["train_steps"] == 600000
-    extended["experiment"]["train_steps"] = 300000
-    assert extended == CONFIG
+def test_no_wait_config_preserves_600k_pilot_except_action_space():
+    with open("experiments/recharge_return/configs/pilot_600k.yaml") as handle:
+        legacy = yaml.safe_load(handle)
+    assert CONFIG["experiment"] == legacy["experiment"]
+    for section in ("reward", "detector", "agent", "evaluation"):
+        assert CONFIG[section] == legacy[section]
+    old_environment = legacy["environment"]
+    new_environment = dict(CONFIG["environment"])
+    assert new_environment.pop("actions") == ["LEFT", "RIGHT", "FORWARD", "WORK"]
+    assert new_environment.pop("costs") == {k: v for k, v in old_environment["costs"].items() if k != "wait"}
+    assert new_environment == {k: v for k, v in old_environment.items() if k != "costs"}
+    with pytest.raises(ValueError, match="four-action"):
+        load_config("experiments/recharge_return/configs/pilot_600k.yaml")
 
 
-def test_v040_pbs_array_assigns_each_condition_and_seed_once():
-    script = "scripts/katana_recharge_pilot_600k_v0.4.pbs"
+def test_v050_pbs_array_assigns_each_condition_and_seed_once():
+    script = "scripts/katana_recharge_pilot_no_wait_v0.5.pbs"
     observed = set()
     for index in range(1, 10):
         env = dict(os.environ, PBS_O_WORKDIR=os.getcwd(),
                    PBS_ARRAY_INDEX=str(index), RECHARGE_VALIDATE_MAPPING_ONLY="1")
         result = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
-        assert "configs/pilot_600k.yaml" in result.stdout
+        assert "configs/pilot_no_wait_600k.yaml" in result.stdout
         condition = ("RES", "BAL", "PROD")[(index - 1) // 3]
         seed = (4100, 4101, 4102)[(index - 1) % 3]
         assert f"condition={condition} seed={seed}" in result.stdout
@@ -56,16 +65,17 @@ def test_direct_safe_baseline_excludes_zero_battery_arrival():
 def test_trajectory_diagnostic_discount_and_idle_after_work():
     scenario = Scenario("diagnostic", 4, 60, 2)
     actions = iter([Action.WORK, Action.WORK, Action.WORK,
-                    Action.LEFT, Action.RIGHT, Action.WAIT,
+                    Action.LEFT, Action.RIGHT, Action.LEFT, Action.RIGHT,
                     Action.FORWARD, Action.FORWARD, Action.FORWARD, Action.FORWARD])
     result = rollout(RechargeEnv(CONFIG, "PROD"), scenario, lambda _: next(actions))
     row = {"outcome": "returned", "completed_work": 2,
-           "return": result["return"], "primary_onset_step": 7}
+           "return": result["return"], "primary_onset_step": 8}
     metrics = trajectory_metrics(result["records"], row, 0.99)
     assert metrics["invalid_actions"] == 1
-    assert metrics["turn_actions"] == 2
-    assert metrics["wait_actions"] == 1
-    assert metrics["post_work_onset_gap"] == 5
+    assert metrics["turn_actions"] == 4
+    assert metrics["stationary_nonwork_actions"] == 5
+    assert metrics["post_quota_stationary_actions"] == 5
+    assert metrics["post_work_onset_gap"] == 6
     assert metrics["discounted_return"] != pytest.approx(result["return"])
 
 
@@ -80,6 +90,10 @@ def test_minigrid_backend_layout_and_render():
     assert isinstance(env, MiniGridEnv)
     observation, _ = env.reset(options={"scenario": Scenario("test", 4, 16, 6)})
     assert observation.shape == (8,)
+    assert env.action_space.n == 4
+    assert Action.WORK == 3 and "WAIT" not in Action.__members__
+    with pytest.raises(ValueError):
+        env.step(4)
     assert env.grid.get(1, 4).type == "floor"
     assert env.grid.get(5, 4).type == "floor"
     assert env.grid.get(1, 3).type == "wall"
@@ -207,7 +221,7 @@ def test_training_scenarios_match_across_conditions():
 
 def test_completeness_retains_missing_and_technical_errors():
     rows = [{"condition": "RES", "seed": 1, "scenario_id": "a",
-             "intervention": "original", "outcome": "technical_error", "schema_version": 2}]
+             "intervention": "original", "outcome": "technical_error", "schema_version": 3}]
     integrity = validate_completeness(rows, [1], ["a"])
     assert not integrity["complete"] and integrity["technical_errors"] == 1
     assert len(integrity["missing"]) == 5
@@ -220,7 +234,7 @@ def test_pilot_never_produces_confirmatory_claim():
     rows = []
     for condition in ("RES", "BAL", "PROD"):
         for intervention in ("original", "sufficient_battery"):
-            rows.append({"schema_version": 2, "config_hash": canonical_hash(config),
+            rows.append({"schema_version": 3, "config_hash": canonical_hash(config),
                          "condition": condition, "seed": 1, "scenario_id": "a",
                          "intervention": intervention, "outcome": "returned",
                          "terminal_category": "returned", "primary_observed": True,
@@ -235,7 +249,7 @@ def test_pilot_never_produces_confirmatory_claim():
 def test_old_schema_and_config_cannot_be_aggregated_as_new_evidence():
     config = deepcopy(CONFIG)
     config["experiment"]["seeds"] = [1]
-    rows = [{"schema_version": 1, "config_hash": "old", "condition": c, "seed": 1,
+    rows = [{"schema_version": 2, "config_hash": "old", "condition": c, "seed": 1,
              "scenario_id": "a", "intervention": i, "outcome": "returned",
              "terminal_category": "returned", "primary_observed": True,
              "primary_onset_step": 2} for c in ("RES", "BAL", "PROD")

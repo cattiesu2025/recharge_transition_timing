@@ -46,7 +46,7 @@ def validate_completeness(rows: list[dict[str, Any]], seeds: list[int], ids: lis
     unexpected = sorted(actual - expected)
     duplicates = sorted(k for k, count in counts.items() if count > 1)
     errors = sum(row.get("outcome") == "technical_error" for row in rows)
-    schema_errors = sum(row.get("schema_version") != 2 for row in rows)
+    schema_errors = sum(row.get("schema_version") != 3 for row in rows)
     config_mismatches = sum(row.get("config_hash") != expected_config_hash for row in rows) if expected_config_hash else 0
     return {"complete": not (missing or unexpected or duplicates or errors or schema_errors or config_mismatches),
             "expected_rows": len(expected), "actual_rows": len(rows),
@@ -137,7 +137,7 @@ def aggregate(config: dict[str, Any], manifest: list[Any], rows: list[dict[str, 
                                          int(config["evaluation"]["bootstrap_seed"]))
         estimate["supports_R1"] = estimate["ci_lower"] > 0
         sign = exact_sign_test(values)
-    return {"schema_version": 2, "phase": config["experiment"]["phase"],
+    return {"schema_version": 3, "phase": config["experiment"]["phase"],
             "integrity": integrity, "all_seeds_estimable": all_estimable,
             "seed_contrasts": contrasts, "confirmatory_prod_minus_res_steps": estimate,
             "exact_sign_test": sign, "event_and_task_counts": rates,

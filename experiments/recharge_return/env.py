@@ -23,8 +23,7 @@ class Action(IntEnum):
     LEFT = 0
     RIGHT = 1
     FORWARD = 2
-    WAIT = 3
-    WORK = 4
+    WORK = 3
 
 
 @dataclass(frozen=True)

@@ -40,6 +40,10 @@ def load_config(path: str | Path) -> dict[str, Any]:
         raise ValueError("Declared seeds must be unique")
     if not 0 < float(value["environment"]["capacity"]):
         raise ValueError("Capacity must be positive")
+    if value["environment"].get("actions") != ["LEFT", "RIGHT", "FORWARD", "WORK"]:
+        raise ValueError("This version requires the four-action no-WAIT config; use v0.4.0 for legacy data")
+    if set(value["environment"]["costs"]) != {"left", "right", "forward", "work"}:
+        raise ValueError("Action costs must match the four-action no-WAIT config")
     if int(value["detector"]["window_steps"]) < int(value["detector"]["progress_moves"]):
         raise ValueError("Detector progress exceeds window")
     return value

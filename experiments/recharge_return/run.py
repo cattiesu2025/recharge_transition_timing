@@ -72,7 +72,7 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
     with gzip.open(trajectory, "wt", encoding="utf-8") as handle:
         for row in records:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
-    row = {"schema_version": 2, "condition": condition, "seed": seed,
+    row = {"schema_version": 3, "condition": condition, "seed": seed,
            "scenario_id": scenario.scenario_id, "intervention": intervention,
            "outcome": result["outcome"], "terminal_category": classify(result, primary),
            "primary_observed": primary["observed"],
@@ -87,7 +87,6 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
            "dock_battery": result["final"]["battery"] if result["final"]["docked"] else None,
            "exhausted": result["outcome"] == "exhausted",
            "walk_steps": sum(r["action"] == Action.FORWARD and r["moved"] for r in records),
-           "wait_steps": sum(r["action"] == Action.WAIT for r in records),
            "work_steps": sum(r["work_completed"] for r in records),
            "onset_battery": onset_record["battery"] if onset_record else None,
            "onset_minimum_energy_to_dock": onset_record["minimum_energy_to_dock"] if onset_record else None,
@@ -165,7 +164,7 @@ def command_evaluate(args: argparse.Namespace) -> None:
                                    intervention, model, checkpoint_hash, output)
             except Exception as error:
                 errors += 1
-                row = {"schema_version": 2, "condition": args.condition, "seed": args.seed,
+                row = {"schema_version": 3, "condition": args.condition, "seed": args.seed,
                        "scenario_id": scenario.scenario_id, "intervention": intervention,
                        "outcome": "technical_error", "terminal_category": "technical_error",
                        "primary_observed": False, "primary_onset_step": None,
@@ -198,7 +197,7 @@ def command_freeze(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
-    default_config = str(PACKAGE / "configs" / "pilot.yaml")
+    default_config = str(PACKAGE / "configs" / "pilot_no_wait_600k.yaml")
     dev = str(PACKAGE / "grids" / "development.json")
     held = str(PACKAGE / "grids" / "held_out.json")
     p = sub.add_parser("probe")

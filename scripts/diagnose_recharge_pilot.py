@@ -55,8 +55,11 @@ def trajectory_metrics(records: list[dict], episode: dict, gamma: float) -> dict
     onset = episode["primary_onset_step"]
     return {"discounted_return": discounted(records, gamma),
             "invalid_actions": sum(not r["valid"] for r in records),
-            "wait_actions": sum(r["action"] == Action.WAIT for r in records),
             "turn_actions": sum(r["action"] in (Action.LEFT, Action.RIGHT) for r in records),
+            "stationary_nonwork_actions": sum(not r["moved"] and not r["work_completed"] for r in records),
+            "post_quota_stationary_actions": sum(
+                r["remaining_before"] == 0 and not r["moved"] and not r["work_completed"]
+                for r in records),
             "post_work_onset_gap": onset - work_steps[-1]
                 if onset is not None and work_steps and onset > work_steps[-1] else None,
             "work_after_onset": sum(step >= onset for step in work_steps) if onset is not None else None,
@@ -93,7 +96,7 @@ def audit(config: dict, scenarios: list[Scenario], eval_root: Path,
             if len(keys) != len(expected) or set(keys) != expected or len(set(keys)) != len(keys):
                 raise ValueError(f"Episode coverage mismatch: {condition}/{seed}")
             for row in episodes:
-                if (row["schema_version"] != 2 or row["condition"] != condition or
+                if (row["schema_version"] != 3 or row["condition"] != condition or
                     row["seed"] != seed or row["config_hash"] != expected_hash or
                     row["checkpoint_sha256"] != checkpoint_hash or
                     row["outcome"] == "technical_error"):
@@ -120,13 +123,14 @@ def audit(config: dict, scenarios: list[Scenario], eval_root: Path,
                 "mean_baseline_minus_policy_return": statistics.mean(r["baseline_minus_policy_return"] for r in group),
                 "median_baseline_minus_policy_return": statistics.median(r["baseline_minus_policy_return"] for r in group),
                 "invalid_actions": sum(r["invalid_actions"] for r in group),
-                "wait_actions": sum(r["wait_actions"] for r in group),
                 "turn_actions": sum(r["turn_actions"] for r in group),
+                "stationary_nonwork_actions": sum(r["stationary_nonwork_actions"] for r in group),
+                "post_quota_stationary_actions": sum(r["post_quota_stationary_actions"] for r in group),
                 "median_post_work_onset_gap": statistics.median(
                     r["post_work_onset_gap"] for r in group if r["post_work_onset_gap"] is not None)
                     if any(r["post_work_onset_gap"] is not None for r in group) else None,
             }
-    return {"schema_version": 1, "kind": "development_pilot_diagnostic",
+    return {"schema_version": 2, "kind": "development_pilot_diagnostic",
             "config_hash": expected_hash, "training_steps": config["experiment"]["train_steps"],
             "seeds": seeds, "scenario_count": len(scenarios),
             "benchmark_scope": "Best successful route among n WORK then direct FORWARD, n=1..quota",
