@@ -29,13 +29,10 @@ def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 def reference_policy(env: RechargeEnv) -> int:
     """A deterministic threshold controller for task feasibility only."""
     safe = float(env.config["reward"]["safe_margin"])
-    if env.position == (1, 4):
+    if env.position == 0:
         if env.remaining > 0 and env.battery - env._cost(Action.WORK) - env.minimum_energy_to_dock() >= safe:
             return Action.WORK
-        return Action.FORWARD if env.direction == 0 else Action.LEFT
-    if env.direction == 0:
-        return Action.FORWARD
-    return Action.LEFT
+    return Action.MOVE_RIGHT
 
 
 def classify(result: dict[str, Any], onset: dict[str, Any]) -> str:
@@ -66,13 +63,13 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
         detectors[f"progress_{k}"] = detect_onset(records,
             DetectorConfig(detector.window_steps, int(k))).to_dict()
     onset_record = next((r for r in records if r["step"] == primary["onset_step"]), None)
-    aux = auxiliary_events(records, scenario.distance + 1)
+    aux = auxiliary_events(records, scenario.distance)
     trajectory = output / "trajectories" / f"{scenario.scenario_id}_{intervention}.jsonl.gz"
     trajectory.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(trajectory, "wt", encoding="utf-8") as handle:
         for row in records:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
-    row = {"schema_version": 3, "condition": condition, "seed": seed,
+    row = {"schema_version": 4, "condition": condition, "seed": seed,
            "scenario_id": scenario.scenario_id, "intervention": intervention,
            "outcome": result["outcome"], "terminal_category": classify(result, primary),
            "primary_observed": primary["observed"],
@@ -86,7 +83,9 @@ def evaluate_one(config: dict[str, Any], condition: str, seed: int,
            "returned_work": result["final"]["total_work"] if result["outcome"] == "returned" else 0,
            "dock_battery": result["final"]["battery"] if result["final"]["docked"] else None,
            "exhausted": result["outcome"] == "exhausted",
-           "walk_steps": sum(r["action"] == Action.FORWARD and r["moved"] for r in records),
+           "move_steps": sum(r["action"] in (Action.MOVE_LEFT, Action.MOVE_RIGHT) and r["moved"] for r in records),
+           "toward_dock_steps": sum(r["action"] == Action.MOVE_RIGHT and r["moved"] for r in records),
+           "away_from_dock_steps": sum(r["action"] == Action.MOVE_LEFT and r["moved"] for r in records),
            "work_steps": sum(r["work_completed"] for r in records),
            "onset_battery": onset_record["battery"] if onset_record else None,
            "onset_minimum_energy_to_dock": onset_record["minimum_energy_to_dock"] if onset_record else None,
@@ -164,7 +163,7 @@ def command_evaluate(args: argparse.Namespace) -> None:
                                    intervention, model, checkpoint_hash, output)
             except Exception as error:
                 errors += 1
-                row = {"schema_version": 3, "condition": args.condition, "seed": args.seed,
+                row = {"schema_version": 4, "condition": args.condition, "seed": args.seed,
                        "scenario_id": scenario.scenario_id, "intervention": intervention,
                        "outcome": "technical_error", "terminal_category": "technical_error",
                        "primary_observed": False, "primary_onset_step": None,
@@ -197,7 +196,7 @@ def command_freeze(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
-    default_config = str(PACKAGE / "configs" / "pilot_no_wait_600k.yaml")
+    default_config = str(PACKAGE / "configs" / "pilot_line_masked_600k.yaml")
     dev = str(PACKAGE / "grids" / "development.json")
     held = str(PACKAGE / "grids" / "held_out.json")
     p = sub.add_parser("probe")

@@ -5,9 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Iterable
 
-from .env import Action
-
-
 @dataclass(frozen=True)
 class DetectorConfig:
     window_steps: int = 8
@@ -44,36 +41,36 @@ class DetectionResult:
 def _toward_dock(record: dict[str, Any]) -> bool:
     before = record["position_before"]
     after = record["position"]
-    return bool(record.get("moved") and after[0] > before[0] and after[1] == before[1] == 4)
+    return bool(record.get("moved") and after > before)
 
 
 def detect_onset(records: Iterable[dict[str, Any]], config: DetectorConfig) -> DetectionResult:
     steps = list(records)
     candidates: list[Candidate] = []
     for index, record in enumerate(steps):
-        if record["position_before"] != [1, 4] or record["position"] != [2, 4] or not _toward_dock(record):
+        if record["position_before"] != 0 or record["position"] != 1 or not _toward_dock(record):
             continue
         progress = 0
         confirmation: int | None = None
         reasons: list[str] = []
         for item in steps[index:index + config.window_steps]:
-            if item.get("work_completed") or item.get("action") == Action.WORK or item["position"] == [1, 4]:
-                reasons.append("returned_to_work_zone")
-                break
             if item.get("outcome") == "exhausted":
                 reasons.append("exhausted_before_confirmation")
                 break
             if item.get("terminated") or item.get("truncated"):
                 reasons.append("episode_ended_before_confirmation")
                 break
+            if item.get("moved") and item["position"] < item["position_before"]:
+                reasons.append("reverse_move")
+                break
+            if item.get("work_completed") or item["position"] == 0:
+                reasons.append("returned_to_work_zone")
+                break
             if _toward_dock(item):
                 progress += 1
                 if progress >= config.progress_moves:
                     confirmation = int(item["step"])
                     break
-            elif item.get("moved") and item["position"][0] < item["position_before"][0]:
-                reasons.append("reverse_move")
-                break
         if confirmation is None and not reasons:
             reasons.append("insufficient_progress")
         candidates.append(Candidate(int(record["step"]), confirmation is not None,
@@ -89,5 +86,5 @@ def auxiliary_events(records: Iterable[dict[str, Any]], dock_x: int) -> dict[str
     def first(predicate):
         return next((int(row["step"]) for row in rows if predicate(row)), None)
     return {"first_toward_dock_step": first(_toward_dock),
-            "first_branch_exit_step": first(lambda r: r["position_before"] == [1, 4] and r["position"] == [2, 4]),
-            "first_dock_step": first(lambda r: r["position"] == [dock_x, 4])}
+            "first_branch_exit_step": first(lambda r: r["position_before"] == 0 and r["position"] == 1),
+            "first_dock_step": first(lambda r: r["position"] == dock_x)}

@@ -4,148 +4,133 @@ from copy import deepcopy
 import os
 import subprocess
 
+import numpy as np
 import pytest
-import yaml
+from minigrid.minigrid_env import MiniGridEnv
 
+from experiments.recharge_return.agent import DoubleDQN, sample_training_scenario
 from experiments.recharge_return.config import canonical_hash, load_config, load_manifest
 from experiments.recharge_return.env import Action, RechargeEnv, Scenario, rollout
 from experiments.recharge_return.events import DetectorConfig, detect_onset
-from experiments.recharge_return.agent import sample_training_scenario
 from scripts.aggregate_recharge_return import aggregate, validate_completeness
-from scripts.diagnose_recharge_pilot import direct_safe_baseline, trajectory_metrics
-from minigrid.minigrid_env import MiniGridEnv
+from scripts.diagnose_recharge_pilot import (direct_safe_baseline,
+                                               exact_optimal_baseline,
+                                               trajectory_metrics)
 
 
-CONFIG = load_config("experiments/recharge_return/configs/pilot_no_wait_600k.yaml")
+CONFIG_PATH = "experiments/recharge_return/configs/pilot_line_masked_600k.yaml"
+CONFIG = load_config(CONFIG_PATH)
 
 
-def test_no_wait_config_preserves_600k_pilot_except_action_space():
-    with open("experiments/recharge_return/configs/pilot_600k.yaml") as handle:
-        legacy = yaml.safe_load(handle)
-    assert CONFIG["experiment"] == legacy["experiment"]
-    for section in ("reward", "detector", "agent", "evaluation"):
-        assert CONFIG[section] == legacy[section]
-    old_environment = legacy["environment"]
-    new_environment = dict(CONFIG["environment"])
-    assert new_environment.pop("actions") == ["LEFT", "RIGHT", "FORWARD", "WORK"]
-    assert new_environment.pop("costs") == {k: v for k, v in old_environment["costs"].items() if k != "wait"}
-    assert new_environment == {k: v for k, v in old_environment.items() if k != "costs"}
-    with pytest.raises(ValueError, match="four-action"):
-        load_config("experiments/recharge_return/configs/pilot_600k.yaml")
+def make_env(battery=16, distance=4, quota=6, condition="BAL"):
+    env = RechargeEnv(CONFIG, condition)
+    env.reset(options={"scenario": Scenario("test", distance, battery, quota)})
+    return env
 
 
-def test_v050_pbs_array_assigns_each_condition_and_seed_once():
-    script = "scripts/katana_recharge_pilot_no_wait_v0.5.pbs"
+def test_v060_config_and_legacy_rejection():
+    assert CONFIG["environment"]["actions"] == ["MOVE_LEFT", "MOVE_RIGHT", "WORK"]
+    assert CONFIG["environment"]["costs"] == {
+        "move_left": 1.0, "move_right": 1.0, "work": 3.5}
+    with pytest.raises(ValueError, match="three-action"):
+        load_config("experiments/recharge_return/configs/pilot_no_wait_600k.yaml")
+
+
+def test_v060_pbs_array_assigns_each_condition_and_seed_once():
+    script = "scripts/katana_recharge_pilot_line_masked_v0.6.pbs"
     observed = set()
     for index in range(1, 10):
         env = dict(os.environ, PBS_O_WORKDIR=os.getcwd(),
                    PBS_ARRAY_INDEX=str(index), RECHARGE_VALIDATE_MAPPING_ONLY="1")
         result = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
-        assert "configs/pilot_no_wait_600k.yaml" in result.stdout
+        assert CONFIG_PATH in result.stdout
         condition = ("RES", "BAL", "PROD")[(index - 1) // 3]
         seed = (4100, 4101, 4102)[(index - 1) % 3]
         assert f"condition={condition} seed={seed}" in result.stdout
         observed.add((condition, seed))
     assert len(observed) == 9
-
     env["PBS_ARRAY_INDEX"] = "10"
     result = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
     assert result.returncode != 0
 
 
-def test_direct_safe_baseline_excludes_zero_battery_arrival():
-    scenario = Scenario("one_safe_work", 4, 8, 3)
-    baseline = direct_safe_baseline(CONFIG, "PROD", scenario)
-    assert baseline["work"] == 1
-    assert baseline["steps"] == 5
-    assert baseline["dock_battery"] == 0.5
-
-
-def test_trajectory_diagnostic_discount_and_idle_after_work():
-    scenario = Scenario("diagnostic", 4, 60, 2)
-    actions = iter([Action.WORK, Action.WORK, Action.WORK,
-                    Action.LEFT, Action.RIGHT, Action.LEFT, Action.RIGHT,
-                    Action.FORWARD, Action.FORWARD, Action.FORWARD, Action.FORWARD])
-    result = rollout(RechargeEnv(CONFIG, "PROD"), scenario, lambda _: next(actions))
-    row = {"outcome": "returned", "completed_work": 2,
-           "return": result["return"], "primary_onset_step": 8}
-    metrics = trajectory_metrics(result["records"], row, 0.99)
-    assert metrics["invalid_actions"] == 1
-    assert metrics["turn_actions"] == 4
-    assert metrics["stationary_nonwork_actions"] == 5
-    assert metrics["post_quota_stationary_actions"] == 5
-    assert metrics["post_work_onset_gap"] == 6
-    assert metrics["discounted_return"] != pytest.approx(result["return"])
-
-
-def make_env(battery=16, distance=4, quota=6):
-    env = RechargeEnv(CONFIG)
-    env.reset(options={"scenario": Scenario("test", distance, battery, quota)})
-    return env
-
-
-def test_minigrid_backend_layout_and_render():
+def test_minigrid_line_layout_render_and_observation():
     env = RechargeEnv(CONFIG, render_mode="rgb_array")
-    assert isinstance(env, MiniGridEnv)
     observation, _ = env.reset(options={"scenario": Scenario("test", 4, 16, 6)})
-    assert observation.shape == (8,)
-    assert env.action_space.n == 4
-    assert Action.WORK == 3 and "WAIT" not in Action.__members__
-    with pytest.raises(ValueError):
-        env.step(4)
-    assert env.grid.get(1, 4).type == "floor"
-    assert env.grid.get(5, 4).type == "floor"
-    assert env.grid.get(1, 3).type == "wall"
+    assert isinstance(env, MiniGridEnv)
+    assert env.width == 11 and env.height == 3
+    assert observation.shape == (9,)
+    assert env.action_space.n == 3 and Action.WORK == 2
+    assert observation[-3:].tolist() == [0.0, 1.0, 1.0]
+    assert env.grid.get(1, 1).type == "floor"
+    assert env.grid.get(5, 1).type == "floor"
+    assert env.grid.get(6, 1).type == "wall"
     assert env.render().shape[-1] == 3
     env.close()
+    text_env = make_env(distance=4)
+    assert text_env.render() == "A-.-.-.-H"
 
 
-def test_energy_and_observation_include_horizon_and_quota():
+def test_masks_and_energy_follow_one_dimensional_state():
     env = make_env()
     before = env._observation()
-    assert env.minimum_energy_to_dock() == 4
+    assert env.position == 0 and env.minimum_energy_to_dock() == 4
     env.step(Action.WORK)
-    after = env._observation()
-    assert after[4] < before[4] and after[5] < before[5]
+    after_work = env._observation()
+    assert after_work[2] < before[2] and after_work[3] < before[3]
     assert env.battery == 12.5
-    env.step(Action.LEFT)
-    assert env.minimum_energy_to_dock() == 4.5
-    env.step(Action.RIGHT)
-    env.step(Action.FORWARD)
-    assert env.minimum_energy_to_dock() == 3
+    env.step(Action.MOVE_RIGHT)
+    assert env.position == 1 and env.minimum_energy_to_dock() == 3
+    assert env.action_mask().tolist() == [True, True, False]
+    env.step(Action.MOVE_LEFT)
+    assert env.position == 0
 
 
-def test_invalid_action_costs_energy_and_no_work_reward():
+def test_masked_actions_are_rejected_without_state_change():
     env = make_env()
-    env.step(Action.FORWARD)
-    battery = env.battery
-    _, _, _, _, info = env.step(Action.WORK)
-    assert not info["valid"] and not info["work_completed"]
-    assert env.remaining == 6 and env.battery == battery - 3.5
+    before = env._info()
+    with pytest.raises(ValueError, match="masked"):
+        env.step(Action.MOVE_LEFT)
+    assert env._info() == before
+    env.step(Action.MOVE_RIGHT)
+    before = env._info()
+    with pytest.raises(ValueError, match="masked"):
+        env.step(Action.WORK)
+    assert env._info() == before
 
 
-def test_work_cap_requires_final_return():
+def test_random_action_selection_respects_mask():
+    env = make_env()
+    observation = env._observation()
+    sampled = {int(DoubleDQN._random_valid_actions(observation)[0]) for _ in range(200)}
+    assert sampled == {Action.MOVE_RIGHT, Action.WORK}
+    env.step(Action.MOVE_RIGHT)
+    sampled = {int(DoubleDQN._random_valid_actions(env._observation())[0]) for _ in range(200)}
+    assert sampled == {Action.MOVE_LEFT, Action.MOVE_RIGHT}
+
+
+def test_work_cap_requires_final_return_and_masks_work():
     env = make_env(battery=16, quota=1)
     _, _, terminated, _, info = env.step(Action.WORK)
     assert not terminated and info["remaining"] == 0
+    assert env.action_mask().tolist() == [False, True, False]
     for _ in range(4):
-        _, _, terminated, _, info = env.step(Action.FORWARD)
+        _, _, terminated, _, info = env.step(Action.MOVE_RIGHT)
     assert terminated and info["outcome"] == "returned" and info["docked"]
     with pytest.raises(RuntimeError):
-        env.step(Action.LEFT)
+        env.step(Action.MOVE_LEFT)
 
 
 def test_zero_work_return_is_separate_outcome():
     env = make_env(battery=10)
-    assert "CHARGE" not in Action.__members__
     for _ in range(4):
-        _, reward, terminated, _, info = env.step(Action.FORWARD)
+        _, reward, terminated, _, info = env.step(Action.MOVE_RIGHT)
     assert terminated and info["outcome"] == "returned_without_work"
     assert not info["completed"] and info["docked"] and reward < 0
 
 
-def test_both_grids_allow_one_safe_work_but_not_full_cap_with_safe_margin():
+def test_both_grids_keep_energy_design():
     for name in ("development", "held_out"):
         rows = load_manifest(f"experiments/recharge_return/grids/{name}.json")
         assert len(rows) == 27
@@ -153,66 +138,61 @@ def test_both_grids_allow_one_safe_work_but_not_full_cap_with_safe_margin():
             env = RechargeEnv(CONFIG)
             env.reset(options={"scenario": row})
             work_energy = row.quota * env._cost(Action.WORK)
+            route_energy = row.distance * env._cost(Action.MOVE_RIGHT)
             safe = CONFIG["reward"]["safe_margin"]
-            assert row.battery - env._cost(Action.WORK) - row.distance >= safe
-            assert row.battery - work_energy - row.distance < safe
-            assert CONFIG["environment"]["capacity"] - work_energy - row.distance >= safe
+            assert row.battery - env._cost(Action.WORK) - route_energy >= safe
+            assert row.battery - work_energy - route_energy < safe
+            assert CONFIG["environment"]["capacity"] - work_energy - route_energy >= safe
 
 
-def test_exhaustion_is_terminal_not_time_censoring():
+def test_exhaustion_and_zero_battery_arrival_precedence():
     env = make_env(battery=1)
-    _, _, terminated, truncated, info = env.step(Action.FORWARD)
+    _, _, terminated, truncated, info = env.step(Action.MOVE_RIGHT)
     assert terminated and not truncated and info["outcome"] == "exhausted"
-
-
-def test_final_work_at_zero_energy_is_exhaustion():
-    env = make_env(battery=3.5, quota=1)
-    _, _, terminated, truncated, info = env.step(Action.WORK)
-    assert terminated and not truncated and info["outcome"] == "exhausted"
-    assert not info["completed"]
-
-
-def test_zero_battery_on_arrival_is_exhaustion():
     env = make_env(battery=7.5)
     env.step(Action.WORK)
     for _ in range(4):
-        _, _, terminated, _, info = env.step(Action.FORWARD)
-    assert terminated and info["outcome"] == "exhausted"
-    assert not info["docked"]
+        _, _, terminated, _, info = env.step(Action.MOVE_RIGHT)
+    assert terminated and info["outcome"] == "exhausted" and not info["docked"]
 
 
-def test_confirmed_return_and_failed_candidates():
+def test_confirmed_onset_rejects_first_exit_followed_by_reversal():
     env = make_env(battery=16, distance=4)
-    actions = iter([Action.FORWARD, Action.LEFT, Action.LEFT, Action.FORWARD,
-                    Action.LEFT, Action.LEFT, Action.FORWARD,
-                    Action.FORWARD, Action.FORWARD])
-    records = []
-    env.reset(options={"scenario": Scenario("test", 4, 16, 6)})
-    for action in actions:
-        before = env._info()
-        _, _, term, trunc, after = env.step(action)
-        records.append({"step": env.steps, "position_before": before["position"],
-                        "position": after["position"], "moved": after["moved"],
-                        "work_completed": after["work_completed"],
-                        "outcome": after["outcome"], "terminated": term, "truncated": trunc})
-    result = detect_onset(records, DetectorConfig())
-    assert len(result.candidates) == 2
-    assert not result.candidates[0].confirmed
-    assert result.observed and result.onset_step == 7 and result.confirmation_step == 9
+    actions = iter([Action.MOVE_RIGHT, Action.MOVE_LEFT,
+                    Action.MOVE_RIGHT, Action.MOVE_RIGHT, Action.MOVE_RIGHT,
+                    Action.MOVE_RIGHT])
+    result = rollout(env, Scenario("test", 4, 16, 6), lambda _: next(actions))
+    detection = detect_onset(result["records"], DetectorConfig())
+    assert len(detection.candidates) == 2
+    assert not detection.candidates[0].confirmed
+    assert detection.candidates[0].rejection_reasons == ["reverse_move"]
+    assert detection.observed and detection.onset_step == 3 and detection.confirmation_step == 5
 
 
-def test_noop_command_does_not_create_event():
-    env = make_env()
-    env.step(Action.LEFT)
-    records = []
-    for _ in range(4):
-        before = env._info()
-        _, _, terminated, truncated, after = env.step(Action.FORWARD)
-        records.append({"step": env.steps, "position_before": before["position"],
-                        "position": after["position"], "moved": after["moved"],
-                        "work_completed": 0, "outcome": after["outcome"],
-                        "terminated": terminated, "truncated": truncated})
-    assert not detect_onset(records, DetectorConfig()).observed
+def test_direct_and_exact_baselines_cover_current_decision_problem():
+    scenario = Scenario("baseline", 4, 16, 6)
+    direct = direct_safe_baseline(CONFIG, "PROD", scenario)
+    optimum = exact_optimal_baseline(CONFIG, "PROD", scenario)
+    assert direct["work"] >= 1 and direct["steps"] == direct["work"] + scenario.distance
+    assert optimum["discounted_return"] >= direct["discounted_return"] - 1e-9
+    assert optimum["outcome"] in {"returned", "exhausted"}
+
+
+def test_trajectory_diagnostic_counts_reversal_and_mask_compliance():
+    scenario = Scenario("diagnostic", 4, 60, 2)
+    actions = iter([Action.WORK, Action.WORK,
+                    Action.MOVE_RIGHT, Action.MOVE_LEFT,
+                    Action.MOVE_RIGHT, Action.MOVE_RIGHT,
+                    Action.MOVE_RIGHT, Action.MOVE_RIGHT])
+    result = rollout(RechargeEnv(CONFIG, "PROD"), scenario, lambda _: next(actions))
+    detection = detect_onset(result["records"], DetectorConfig()).to_dict()
+    row = {"outcome": "returned", "completed_work": 2,
+           "return": result["return"], "primary_onset_step": detection["onset_step"]}
+    metrics = trajectory_metrics(result["records"], row, 0.99)
+    assert metrics["masked_action_violations"] == 0
+    assert metrics["left_moves"] == 1 and metrics["right_moves"] == 5
+    assert metrics["stationary_nonwork_actions"] == 0
+    assert metrics["discounted_return"] != pytest.approx(result["return"])
 
 
 def test_training_scenarios_match_across_conditions():
@@ -221,7 +201,7 @@ def test_training_scenarios_match_across_conditions():
 
 def test_completeness_retains_missing_and_technical_errors():
     rows = [{"condition": "RES", "seed": 1, "scenario_id": "a",
-             "intervention": "original", "outcome": "technical_error", "schema_version": 3}]
+             "intervention": "original", "outcome": "technical_error", "schema_version": 4}]
     integrity = validate_completeness(rows, [1], ["a"])
     assert not integrity["complete"] and integrity["technical_errors"] == 1
     assert len(integrity["missing"]) == 5
@@ -234,7 +214,7 @@ def test_pilot_never_produces_confirmatory_claim():
     rows = []
     for condition in ("RES", "BAL", "PROD"):
         for intervention in ("original", "sufficient_battery"):
-            rows.append({"schema_version": 3, "config_hash": canonical_hash(config),
+            rows.append({"schema_version": 4, "config_hash": canonical_hash(config),
                          "condition": condition, "seed": 1, "scenario_id": "a",
                          "intervention": intervention, "outcome": "returned",
                          "terminal_category": "returned", "primary_observed": True,
@@ -249,7 +229,7 @@ def test_pilot_never_produces_confirmatory_claim():
 def test_old_schema_and_config_cannot_be_aggregated_as_new_evidence():
     config = deepcopy(CONFIG)
     config["experiment"]["seeds"] = [1]
-    rows = [{"schema_version": 2, "config_hash": "old", "condition": c, "seed": 1,
+    rows = [{"schema_version": 3, "config_hash": "old", "condition": c, "seed": 1,
              "scenario_id": "a", "intervention": i, "outcome": "returned",
              "terminal_category": "returned", "primary_observed": True,
              "primary_onset_step": 2} for c in ("RES", "BAL", "PROD")

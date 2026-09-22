@@ -43,7 +43,7 @@ assert minigrid.__version__ == "2.5.0"
 print("Katana environment ready:", gymnasium.__version__, minigrid.__version__, stable_baselines3.__version__, torch.__version__)
 PY
 
-record_dir="outputs/recharge_return_v0.5.0_pilot_no_wait_600k/environment"
+record_dir="outputs/recharge_return_v0.6.0_pilot_line_masked_600k/environment"
 mkdir -p "$record_dir"
 python -m pip freeze > "$record_dir/pip-freeze.txt"
 python --version > "$record_dir/python-version.txt" 2>&1

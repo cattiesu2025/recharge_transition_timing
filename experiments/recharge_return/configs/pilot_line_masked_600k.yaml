@@ -1,0 +1,54 @@
+experiment:
+  phase: pilot
+  train_steps: 600000
+  seeds: [4100, 4101, 4102]
+environment:
+  capacity: 60
+  actions: [MOVE_LEFT, MOVE_RIGHT, WORK]
+  max_steps: 300
+  max_quota: 11
+  costs:
+    move_left: 1.0
+    move_right: 1.0
+    work: 3.5
+  default_scenario:
+    scenario_id: default
+    distance: 5
+    battery: 19
+    quota: 8
+  training_distribution:
+    distances: [4, 5, 6, 7, 8, 9]
+    batteries: [16, 17, 19, 20, 22, 23, 60]
+    quotas: [6, 7, 8, 9, 10, 11]
+reward:
+  safe_margin: 4
+  time_cost: 0.01
+  return_bonus: 3.0
+  empty_return_penalty: 3.0
+  exhaustion_penalty: 5.0
+  conditions:
+    RES: {production: 0.25, reserve: 1.0}
+    BAL: {production: 0.625, reserve: 0.625}
+    PROD: {production: 1.0, reserve: 0.25}
+detector:
+  window_steps: 8
+  progress_moves: 3
+  sensitivity_progress_moves: [2, 4]
+agent:
+  learning_rate: 0.0003
+  replay_capacity: 100000
+  learning_starts: 5000
+  batch_size: 64
+  gamma: 0.99
+  train_frequency: 4
+  gradient_steps: 1
+  target_update_interval: 1000
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay_steps: 150000
+  gradient_clip: 10.0
+  hidden_sizes: [128, 128]
+evaluation:
+  minimum_joint_events: 18
+  bootstrap_samples: 10000
+  bootstrap_seed: 8731

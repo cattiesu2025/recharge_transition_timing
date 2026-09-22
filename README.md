@@ -1,10 +1,12 @@
 # Battery-aware work-to-return transition
 
-当前版本的公开文件哈希在 [v0.5.0 manifest](docs/versions/v0.5.0.json)。本地研究日志、计划与用户约束文件留在 `docs/`，不纳入仓库。
+The published source hashes for this revision are recorded in the [v0.6.0 manifest](docs/versions/v0.6.0.json). Local research notes remain unpublished.
 
-This project implements a single-sortie MiniGrid 2.5.0 pilot. The v0.5.0 agent has four actions: LEFT, RIGHT, FORWARD, WORK. WAIT was removed after the v0.4.0 development pilot showed nonproductive waiting. The reward, grid, model, detector, three conditions, three seeds, and 600,000-step budget remain as specified in the [pilot protocol](experiments/recharge_return/protocol.md). This is pilot work, not formal or held-out evidence.
+The current v0.6.0 pilot studies how many work units a policy completes before returning along a one-dimensional line. It uses MiniGrid 2.5.0 as the environment and rendering base, but does not ask the agent to solve route planning. The three atomic actions are MOVE_LEFT, MOVE_RIGHT, and WORK. The policy controls every movement and may reverse, so return ONSET is confirmed from the trajectory rather than supplied by a RETURN macro action.
 
-The five-action v0.4.0 checkpoints and trajectories are incompatible with the four-action model. The current loader rejects the old pilot configs; use the v0.4.0 Git revision when reproducing historical results. New training and evaluation use separate `outputs/recharge_return_v0.5.0_pilot_no_wait_600k/` paths.
+State-dependent action masks remove movement beyond the line and WORK outside the work point or after quota completion. Masks are applied during warmup, epsilon exploration, greedy and deterministic prediction, and Double DQN bootstrap action selection. They never depend on reward condition or battery reserve. The reward conditions, scenario axes, three seeds, and 600,000-step pilot budget are specified in the [protocol](experiments/recharge_return/protocol.md).
+
+The v0.6.0 action order, observation, model output, evaluation schema, and diagnostics are incompatible with v0.5.0 and earlier files. Historical configs, scripts, checkpoints, and outputs remain for audit and require their matching Git revision. Current outputs use `outputs/recharge_return_v0.6.0_pilot_line_masked_600k/`.
 
 ## Run locally
 
@@ -14,49 +16,49 @@ python -m venv .venv
 .venv/bin/python -m pytest -q
 
 .venv/bin/python -m experiments.recharge_return.run probe \
-  --config experiments/recharge_return/configs/pilot_no_wait_600k.yaml \
-  --output outputs/recharge_return_v0.5.0_pilot_no_wait_600k/probe.jsonl
+  --config experiments/recharge_return/configs/pilot_line_masked_600k.yaml \
+  --output outputs/recharge_return_v0.6.0_pilot_line_masked_600k/probe.jsonl
 
 .venv/bin/python -m experiments.recharge_return.run train \
-  --config experiments/recharge_return/configs/pilot_no_wait_600k.yaml \
+  --config experiments/recharge_return/configs/pilot_line_masked_600k.yaml \
   --condition RES --seed 4100 \
-  --output outputs/recharge_return_v0.5.0_pilot_no_wait_600k/RES/4100
+  --output outputs/recharge_return_v0.6.0_pilot_line_masked_600k/RES/4100
 
 .venv/bin/python -m experiments.recharge_return.run evaluate \
-  --config experiments/recharge_return/configs/pilot_no_wait_600k.yaml \
+  --config experiments/recharge_return/configs/pilot_line_masked_600k.yaml \
   --condition RES --seed 4100 \
   --manifest experiments/recharge_return/grids/development.json \
-  --checkpoint outputs/recharge_return_v0.5.0_pilot_no_wait_600k/RES/4100/final.zip \
-  --output outputs/recharge_return_v0.5.0_pilot_no_wait_600k/dev_eval/RES/4100
+  --checkpoint outputs/recharge_return_v0.6.0_pilot_line_masked_600k/RES/4100/final.zip \
+  --output outputs/recharge_return_v0.6.0_pilot_line_masked_600k/dev_eval/RES/4100
 ```
 
-Train and evaluate all RES/BAL/PROD × 4100/4101/4102 combinations before running the complete development diagnostic and aggregate:
+After all RES/BAL/PROD × 4100/4101/4102 jobs finish, run:
 
 ```bash
 .venv/bin/python -m scripts.diagnose_recharge_pilot \
-  --config experiments/recharge_return/configs/pilot_no_wait_600k.yaml \
-  --input outputs/recharge_return_v0.5.0_pilot_no_wait_600k/dev_eval \
-  --output outputs/recharge_return_v0.5.0_pilot_no_wait_600k/diagnostic_all.json
+  --config experiments/recharge_return/configs/pilot_line_masked_600k.yaml \
+  --input outputs/recharge_return_v0.6.0_pilot_line_masked_600k/dev_eval \
+  --output outputs/recharge_return_v0.6.0_pilot_line_masked_600k/diagnostic_all.json
 
 .venv/bin/python scripts/aggregate_recharge_return.py \
-  --config experiments/recharge_return/configs/pilot_no_wait_600k.yaml \
+  --config experiments/recharge_return/configs/pilot_line_masked_600k.yaml \
   --manifest experiments/recharge_return/grids/development.json \
-  --input outputs/recharge_return_v0.5.0_pilot_no_wait_600k/dev_eval \
-  --output outputs/recharge_return_v0.5.0_pilot_no_wait_600k/dev_summary
+  --input outputs/recharge_return_v0.6.0_pilot_line_masked_600k/dev_eval \
+  --output outputs/recharge_return_v0.6.0_pilot_line_masked_600k/dev_summary
 ```
 
-The diagnostic checks checkpoint, config, episode, and trajectory provenance. It compares discounted return with the best successful direct work-and-return route and counts invalid actions, turns, stationary actions without work, and stationary actions after the work cap. The route benchmark is not a global MDP optimum. Removing WAIT does not prevent invalid WORK, blocked FORWARD, or repeated turns; check those outcomes before interpreting ONSET timing.
+The diagnostic checks checkpoint, config, episode, and trajectory provenance. It compares each policy with the best direct work-and-return route and the exact finite-state optimum, then reports return regret, work, reversals, mask violations, stationary actions, and ONSET timing. Computational baselines and probes verify the environment and reward; they are not learned-policy evidence.
 
 ## Run on Katana
 
-If the project venv has not been prepared, submit `qsub scripts/katana_recharge_setup.pbs` from the project root and check its log. The setup script uses `python/3.11.3` and `/srv/scratch/$USER/environments/recharge-return-py311` by default. Use the same Python module and venv for training. From the v0.5.0 checkout, submit all nine fixed-budget jobs with one command:
+If needed, submit `qsub scripts/katana_recharge_setup.pbs` and inspect its log. The setup uses `python/3.11.3` and `/srv/scratch/$USER/environments/recharge-return-py311` by default. Submit all nine fixed-budget pilot jobs from the v0.6.0 checkout with:
 
 ```bash
-qsub scripts/katana_recharge_pilot_no_wait_v0.5.pbs
+qsub scripts/katana_recharge_pilot_line_masked_v0.6.pbs
 ```
 
-The PBS `#PBS -J 1-9` array maps indices 1–3 to RES/4100–4102, 4–6 to BAL/4100–4102, and 7–9 to PROD/4100–4102. Each sub-job trains its own final checkpoint and evaluates the development grid. It refuses to overwrite an existing condition/seed directory and requests eight hours per sub-job; check actual completion and walltime on Katana. Copy the whole v0.5.0 output tree locally before running the diagnostic. Historical v0.3.x/v0.4.0 PBS scripts remain in Git for audit but use the five-action configs and are rejected by the current loader.
+The PBS array maps indices 1–3 to RES/4100–4102, 4–6 to BAL/4100–4102, and 7–9 to PROD/4100–4102. Each task trains one final checkpoint and evaluates the development manifest. It refuses to overwrite an existing condition/seed output.
 
-## Formal boundary
+## Evidence boundary
 
-Pilot, formal freeze, formal training, and held-out evaluation remain separate. Formal work needs a reviewed `formal` config with 20 declared seeds and an immutable freeze. The freeze command requires `--confirm-calibrated`, Python and dependency locks, and a separate output directory. Formal training/evaluation require its `--freeze-manifest`; do not use development pilot results as confirmatory R1 evidence.
+This remains a development pilot. Formal work requires a reviewed formal config, 20 declared seeds, immutable freeze, and a separate output directory. Held-out evaluation occurs only after that freeze. Reference, smoke, development, and pilot results do not provide confirmatory R1 evidence.

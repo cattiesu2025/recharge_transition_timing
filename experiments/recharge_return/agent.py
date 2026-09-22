@@ -16,10 +16,54 @@ from stable_baselines3.common.callbacks import BaseCallback
 from torch.nn import functional as F
 
 from .config import canonical_hash, file_hash
-from .env import RechargeEnv, Scenario
+from .env import ACTION_COUNT, MASK_SLICE, RechargeEnv, Scenario
 
 
 class DoubleDQN(DQN):
+    @staticmethod
+    def _random_valid_actions(observation: np.ndarray) -> np.ndarray:
+        values = np.asarray(observation)
+        masks = values[..., MASK_SLICE] > 0.5
+        if masks.ndim == 1:
+            masks = masks[None, :]
+        actions = []
+        for mask in masks:
+            valid = np.flatnonzero(mask)
+            if len(valid) == 0:
+                raise ValueError("Observation has no valid actions")
+            actions.append(int(np.random.choice(valid)))
+        return np.asarray(actions, dtype=np.int64)
+
+    def predict(self, observation, state=None, episode_start=None, deterministic=False):
+        """Epsilon-greedy prediction restricted to the observation's action mask."""
+        obs_tensor, vectorized = self.policy.obs_to_tensor(observation)
+        with th.no_grad():
+            q_values = self.q_net(obs_tensor)
+            masks = obs_tensor[..., MASK_SLICE] > 0.5
+            if masks.shape[-1] != ACTION_COUNT or not th.all(masks.any(dim=1)):
+                raise ValueError("Observation contains an invalid action mask")
+            actions = q_values.masked_fill(~masks, -th.inf).argmax(dim=1).cpu().numpy()
+        if not deterministic:
+            random_actions = self._random_valid_actions(np.asarray(observation))
+            if random_actions.shape != actions.shape:
+                random_actions = random_actions.reshape(actions.shape)
+            explore = np.random.random(len(actions)) < self.exploration_rate
+            actions = np.where(explore, random_actions, actions)
+        if not vectorized:
+            actions = actions.squeeze(axis=0)
+        return actions, state
+
+    def _sample_action(self, learning_starts: int, action_noise=None,
+                       n_envs: int = 1) -> tuple[np.ndarray, np.ndarray]:
+        """Use valid actions during replay-buffer warmup as well as epsilon exploration."""
+        assert self._last_obs is not None, "Last observation is required for action masking"
+        if self.num_timesteps < learning_starts:
+            action = self._random_valid_actions(self._last_obs)
+        else:
+            action, _ = self.predict(self._last_obs, deterministic=False)
+            action = np.asarray(action, dtype=np.int64).reshape(n_envs)
+        return action, action.copy()
+
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
         self.policy.set_training_mode(True)
         self._update_learning_rate(self.policy.optimizer)
@@ -28,7 +72,9 @@ class DoubleDQN(DQN):
             data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
             discounts = data.discounts if getattr(data, "discounts", None) is not None else self.gamma
             with th.no_grad():
-                actions = self.q_net(data.next_observations).argmax(dim=1, keepdim=True)
+                online_values = self.q_net(data.next_observations)
+                masks = data.next_observations[..., MASK_SLICE] > 0.5
+                actions = online_values.masked_fill(~masks, -th.inf).argmax(dim=1, keepdim=True)
                 values = self.q_net_target(data.next_observations).gather(1, actions)
                 target = data.rewards + (1 - data.dones) * discounts * values
             current = self.q_net(data.observations).gather(1, data.actions.long())
@@ -134,7 +180,7 @@ def train_condition(config: dict[str, Any], condition: str, seed: int,
     model.learn(total_timesteps=total, callback=callback, log_interval=None)
     checkpoint = dest / "final.zip"
     model.save(checkpoint)
-    metadata = {"algorithm": "DoubleDQN_overridden_SB3_DQN_train",
+    metadata = {"algorithm": "MaskedDoubleDQN_overridden_SB3_DQN_train_and_predict",
         "stable_baselines3_version": stable_baselines3.__version__,
         "condition": condition, "seed": seed, "training_steps": model.num_timesteps,
         "episodes": callback.completed, "config_hash": canonical_hash(config),
