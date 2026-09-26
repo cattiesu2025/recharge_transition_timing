@@ -20,10 +20,13 @@ from .env import ACTION_COUNT, MASK_SLICE, RechargeEnv, Scenario
 
 
 class DoubleDQN(DQN):
-    @staticmethod
-    def _random_valid_actions(observation: np.ndarray) -> np.ndarray:
+    mask_slice = MASK_SLICE
+    action_count = ACTION_COUNT
+
+    @classmethod
+    def _random_valid_actions(cls, observation: np.ndarray) -> np.ndarray:
         values = np.asarray(observation)
-        masks = values[..., MASK_SLICE] > 0.5
+        masks = values[..., cls.mask_slice] > 0.5
         if masks.ndim == 1:
             masks = masks[None, :]
         actions = []
@@ -39,8 +42,8 @@ class DoubleDQN(DQN):
         obs_tensor, vectorized = self.policy.obs_to_tensor(observation)
         with th.no_grad():
             q_values = self.q_net(obs_tensor)
-            masks = obs_tensor[..., MASK_SLICE] > 0.5
-            if masks.shape[-1] != ACTION_COUNT or not th.all(masks.any(dim=1)):
+            masks = obs_tensor[..., self.mask_slice] > 0.5
+            if masks.shape[-1] != self.action_count or not th.all(masks.any(dim=1)):
                 raise ValueError("Observation contains an invalid action mask")
             actions = q_values.masked_fill(~masks, -th.inf).argmax(dim=1).cpu().numpy()
         if not deterministic:
@@ -73,7 +76,7 @@ class DoubleDQN(DQN):
             discounts = data.discounts if getattr(data, "discounts", None) is not None else self.gamma
             with th.no_grad():
                 online_values = self.q_net(data.next_observations)
-                masks = data.next_observations[..., MASK_SLICE] > 0.5
+                masks = data.next_observations[..., self.mask_slice] > 0.5
                 actions = online_values.masked_fill(~masks, -th.inf).argmax(dim=1, keepdim=True)
                 values = self.q_net_target(data.next_observations).gather(1, actions)
                 target = data.rewards + (1 - data.dones) * discounts * values
