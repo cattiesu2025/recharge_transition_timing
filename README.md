@@ -1,5 +1,26 @@
 # Battery-aware work-to-return transition
 
+## Current grid pilot: v0.7.2
+
+The grid pilot now saves checkpoints every 50k steps through 600k, selects the best
+mean cumulative reward on a fixed 296-scene validation set, and evaluates both
+the selected and final models on all 333 development scenes. All three conditions
+and all three seeds are retained; ONSET is never used for model selection.
+
+After synchronizing this source version, submit from the Katana project root:
+
+```bash
+qsub scripts/katana_recharge_grid_v0.7.2.pbs
+```
+
+See the [selection protocol and output guide](experiments/recharge_return/checkpoint_selection.md)
+and [v0.7.2 source manifest](docs/versions/v0.7.2.json).
+Output is isolated in `outputs/recharge_return_v0.7.2_grid_selection/` and existing
+runs are never overwritten. This remains a development pilot, not formal evidence.
+The old `katana_recharge_grid_v0.7.pbs` still runs the final-only pipeline.
+
+## Historical one-dimensional pilot: v0.6.0
+
 The published source hashes for this revision are recorded in the [v0.6.0 manifest](docs/versions/v0.6.0.json). Local research notes remain unpublished.
 
 The current v0.6.0 pilot studies how many work units a policy completes before returning along a one-dimensional line. It uses MiniGrid 2.5.0 as the environment and rendering base, but does not ask the agent to solve route planning. The three atomic actions are MOVE_LEFT, MOVE_RIGHT, and WORK. The policy controls every movement and may reverse, so return ONSET is confirmed from the trajectory rather than supplied by a RETURN macro action.
