@@ -1,5 +1,21 @@
 # Battery-aware work-to-return transition
 
+## Expanded validation: v0.7.3
+
+Re-evaluate the existing v0.7.2 checkpoints on 60 fixed validation layouts
+(2,220 scenes), including aligned, detour and scattered tasks. Select by validation
+reward only, then compare best/final on a separate 60-layout audit set and the
+original development set. This is exploratory reselection, not retraining or formal evidence.
+
+```bash
+qsub scripts/katana_recharge_grid_v0.7.3.pbs
+```
+
+Requires the complete v0.7.2 output tree on Katana. New outputs are isolated in
+`outputs/recharge_return_v0.7.3_expanded_validation/`; old models and selections are unchanged.
+See the [expanded validation protocol](experiments/recharge_return/expanded_validation.md)
+and [v0.7.3 source manifest](docs/versions/v0.7.3.json).
+
 ## Current grid pilot: v0.7.2
 
 The grid pilot now saves checkpoints every 50k steps through 600k, selects the best
